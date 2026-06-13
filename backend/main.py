@@ -61,6 +61,12 @@ async def lifespan(app: FastAPI):
     scraper = UPCScraper(http_client)
     foundry_iq = get_foundry_iq_service(db_path="shelfwise.db")
     logger.info("ShelfWise API started (optimized) | Foundry IQ: %s", "azure" if foundry_iq.is_real_integration else "local_simulation")
+    logger.info(
+        "Foundry reasoning clients | azure-ai-inference=%s azure-ai-projects=%s openai-compatible=%s",
+        agent._azure_client is not None,
+        agent._azure_projects_client is not None,
+        agent._openai_client is not None,
+    )
     yield
     if http_client:
         await http_client.aclose()

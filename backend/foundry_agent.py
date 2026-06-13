@@ -11,7 +11,18 @@ import os
 import asyncio
 import re
 import json
+import logging
 from typing import List, Dict, Optional, Tuple, Any
+from pathlib import Path
+
+# Ensure .env is loaded before reading env vars
+try:
+    from dotenv import load_dotenv
+    _env_path = Path(__file__).resolve().parent.parent / ".env"
+    if _env_path.exists():
+        load_dotenv(_env_path)
+except Exception:
+    pass
 
 # ---------------------------------------------------------------------------
 # Microsoft Azure AI Foundry SDK imports (graceful degradation if missing)
@@ -83,20 +94,27 @@ class ProductReasoningAgent:
         self._init_clients()
 
     def _init_clients(self):
-        """Initialize Microsoft Foundry SDK clients from environment."""
-        endpoint = os.environ.get("FOUNDRY_ENDPOINT", "")
-        api_key = os.environ.get("FOUNDRY_API_KEY", "")
+        """Initialize Microsoft Foundry SDK clients from environment.
+
+        Supports both FOUNDRY_ENDPOINT/FOUNDRY_API_KEY and the Azure-native
+        AZURE_FOUNDRY_ENDPOINT/AZURE_FOUNDRY_KEY variable names.
+        """
+        endpoint = os.environ.get("FOUNDRY_ENDPOINT", "") or os.environ.get("AZURE_FOUNDRY_ENDPOINT", "")
+        api_key = os.environ.get("FOUNDRY_API_KEY", "") or os.environ.get("AZURE_FOUNDRY_KEY", "")
         conn_str = os.environ.get("AZURE_FOUNDRY_CONNECTION_STRING", "")
 
         # --- Tier 1: Azure AI Inference SDK ---
         # Primary: Azure AI Inference endpoints (GitHub Models, Azure OpenAI, etc.)
         if _AZURE_INFERENCE_AVAILABLE and endpoint and api_key and ("azure.com" in endpoint or "inference.ai" in endpoint):
             try:
+                model = os.environ.get("FOUNDRY_MODEL", "gpt-4o")
                 self._azure_client = ChatCompletionsClient(
-                    endpoint=endpoint.rstrip("/") + "/openai/deployments/" + os.environ.get("FOUNDRY_MODEL", "gpt-4o"),
+                    endpoint=endpoint.rstrip("/") + "/openai/deployments/" + model,
                     credential=AzureKeyCredential(api_key),
                 )
-            except Exception:
+            except Exception as e:
+                logger = logging.getLogger("shelfwise")
+                logger.warning("Azure AI Inference client init failed: %s", e)
                 self._azure_client = None
 
         # --- Tier 1b: Azure AI Projects (Agent SDK) ---
@@ -106,7 +124,9 @@ class ProductReasoningAgent:
                     credential=DefaultAzureCredential(),
                     conn_str=conn_str,
                 )
-            except Exception:
+            except Exception as e:
+                logger = logging.getLogger("shelfwise")
+                logger.warning("Azure AI Projects client init failed: %s", e)
                 self._azure_projects_client = None
 
         # --- Tier 2: OpenAI-compatible (Ollama / GitHub Models) ---
@@ -116,7 +136,9 @@ class ProductReasoningAgent:
                     base_url=endpoint,
                     api_key=api_key,
                 )
-            except Exception:
+            except Exception as e:
+                logger = logging.getLogger("shelfwise")
+                logger.warning("OpenAI-compatible client init failed: %s", e)
                 self._openai_client = None
 
     # -----------------------------------------------------------------------
@@ -213,6 +235,8 @@ class ProductReasoningAgent:
             "images": images, "attributes": attributes,
             "confidence": round(confidence, 3), "status": status,
             "citations": citations, "reasoning_trace": trace,
+            "foundry_enriched": bool(foundry_result and foundry_result.get("data")),
+            "foundry_sdk": (foundry_result.get("sdk") if foundry_result else None),
         }
 
     # -----------------------------------------------------------------------

@@ -57,12 +57,24 @@ def init_db():
                 category TEXT,
                 confidence REAL,
                 status TEXT,
+                foundry_enriched INTEGER DEFAULT 0,
+                foundry_sdk TEXT,
                 data TEXT NOT NULL,
                 created_at TEXT,
                 updated_at TEXT
             )
             """
         )
+
+        # Migrate existing tables if they don't have the new columns
+        try:
+            conn.execute("ALTER TABLE products ADD COLUMN foundry_enriched INTEGER DEFAULT 0")
+        except Exception:
+            pass
+        try:
+            conn.execute("ALTER TABLE products ADD COLUMN foundry_sdk TEXT")
+        except Exception:
+            pass
 
         # Jobs table
         conn.execute(
@@ -138,14 +150,16 @@ def upsert_product(product: ConsolidatedProduct):
     with _db_lock:
         conn.execute(
             """
-            INSERT INTO products (upc, name, brand, category, confidence, status, data, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO products (upc, name, brand, category, confidence, status, foundry_enriched, foundry_sdk, data, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(upc) DO UPDATE SET
                 name = excluded.name,
                 brand = excluded.brand,
                 category = excluded.category,
                 confidence = excluded.confidence,
                 status = excluded.status,
+                foundry_enriched = excluded.foundry_enriched,
+                foundry_sdk = excluded.foundry_sdk,
                 data = excluded.data,
                 updated_at = excluded.updated_at
             """,
@@ -156,6 +170,8 @@ def upsert_product(product: ConsolidatedProduct):
                 product.category,
                 product.confidence,
                 product.status,
+                1 if product.foundry_enriched else 0,
+                product.foundry_sdk,
                 data,
                 now,
                 now,
@@ -180,6 +196,8 @@ def bulk_upsert_products(products: List[ConsolidatedProduct]):
                 p.category,
                 p.confidence,
                 p.status,
+                1 if p.foundry_enriched else 0,
+                p.foundry_sdk,
                 json.dumps(p.model_dump()),
                 now,
                 now,
@@ -188,14 +206,16 @@ def bulk_upsert_products(products: List[ConsolidatedProduct]):
     with _db_lock:
         conn.executemany(
             """
-            INSERT INTO products (upc, name, brand, category, confidence, status, data, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO products (upc, name, brand, category, confidence, status, foundry_enriched, foundry_sdk, data, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(upc) DO UPDATE SET
                 name = excluded.name,
                 brand = excluded.brand,
                 category = excluded.category,
                 confidence = excluded.confidence,
                 status = excluded.status,
+                foundry_enriched = excluded.foundry_enriched,
+                foundry_sdk = excluded.foundry_sdk,
                 data = excluded.data,
                 updated_at = excluded.updated_at
             """,

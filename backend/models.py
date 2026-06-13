@@ -44,6 +44,8 @@ class ConsolidatedProduct(BaseModel):
     status: str = "partial"
     citations: List[Citation] = []
     reasoning_trace: List[str] = []
+    foundry_enriched: bool = False
+    foundry_sdk: Optional[str] = None
 
 
 class UPCBatchRequest(BaseModel):
