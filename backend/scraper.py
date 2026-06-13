@@ -160,14 +160,19 @@ class UPCScraper:
         self.request_count += 1
         return headers
 
-    async def _get_with_retry(self, url: str, headers: Optional[dict] = None,
-                              timeout: float = 10.0, retries: int = 2) -> httpx.Response:
+    async def _get_with_retry(self, url: str, timeout: float = 10.0, retries: int = 2,
+                              **kwargs) -> httpx.Response:
         """GET with exponential backoff retry."""
         last_error = None
+        # Build headers from kwarg or default
+        headers = kwargs.pop("headers", DEFAULT_HEADERS)
+        if isinstance(headers, dict):
+            headers = dict(headers)  # copy
+        else:
+            headers = dict(DEFAULT_HEADERS)
         for attempt in range(retries + 1):
             try:
-                h = {**(headers or DEFAULT_HEADERS)}
-                response = await self.client.get(url, headers=h, timeout=timeout)
+                response = await self.client.get(url, headers=headers, timeout=timeout, **kwargs)
                 response.raise_for_status()
                 return response
             except Exception as e:
@@ -201,11 +206,12 @@ class UPCScraper:
                     del self._inflight[upc]
 
     async def _scrape_all_impl(self, upc: str) -> List[Dict[str, Any]]:
-        """Internal: scrape all sources concurrently."""
+        """Internal: scrape all sources concurrently including registry sources."""
         results = []
         start = time.time()
 
-        scrapers = [
+        # Core hardcoded scrapers (proven, high-quality parsers)
+        core_scrapers = [
             ("Open Food Facts", self._open_food_facts),
             ("UPCItemDB", self._upcitemdb),
             ("BarcodeLookup", self._barcode_lookup),
@@ -217,16 +223,45 @@ class UPCScraper:
             ("Brave Search", self._brave_search),
             ("Google Search", self._google_search),
         ]
+        
+        # Dynamic registry scrapers (100+ additional sources)
+        registry_sources = self._get_registry_sources()
+        # Pair each source with its scraper to preserve weight for sorting
+        registry_pairs = [
+            (src, self._make_registry_scraper(src))
+            for src in registry_sources
+        ]
+        
+        # Combine all scrapers: core + registry
+        all_scrapers = core_scrapers + [(src["name"], fn) for src, fn in registry_pairs]
+        
+        # Deduplicate by source name (registry may duplicate core sources)
+        seen_names = set()
+        unique_scrapers = []
+        for name, fn in all_scrapers:
+            if name not in seen_names:
+                seen_names.add(name)
+                unique_scrapers.append((name, fn))
 
-        tasks = [self._safe_scrape(name, fn, upc) for name, fn in scrapers]
+        # Run all unique sources up to a safety ceiling of 200
+        max_concurrent = 200
+        if len(unique_scrapers) > max_concurrent:
+            sorted_registry = sorted(registry_pairs, key=lambda p: p[0].get("weight", 0.3), reverse=True)
+            core_names = {n for n, _ in core_scrapers}
+            extra_registry = [(src["name"], fn) for src, fn in sorted_registry if src["name"] not in core_names]
+            unique_scrapers = core_scrapers + extra_registry[:max_concurrent - len(core_scrapers)]
+
+        tasks = [self._safe_scrape(name, fn, upc) for name, fn in unique_scrapers]
         source_results = await asyncio.gather(*tasks, return_exceptions=True)
 
         for r in source_results:
-            if isinstance(r, dict) and r.get("success"):
+            if isinstance(r, dict):
                 results.append(r)
 
         elapsed = time.time() - start
-        logger.info(f"UPC {upc}: scraped {len(results)} sources in {elapsed:.2f}s")
+        total_sources = len(unique_scrapers)
+        successful = sum(1 for r in results if r.get("success"))
+        logger.info(f"UPC {upc}: scraped {successful}/{total_sources} sources in {elapsed:.2f}s")
 
         if not results:
             fallback = self._get_demo_fallback(upc)
@@ -234,6 +269,207 @@ class UPCScraper:
                 results.append(fallback)
 
         return results
+    
+    def _get_registry_sources(self) -> List[Dict[str, Any]]:
+        """Load scraper sources from registry file."""
+        try:
+            from backend.scraper_registry import ScraperRegistry
+            registry = ScraperRegistry()
+            return registry.get_enabled_sources()
+        except Exception as e:
+            logger.warning(f"Could not load scraper registry: {e}")
+            return []
+    
+    def _make_registry_scraper(self, source_def: Dict[str, Any]):
+        """Create a dynamic scraper function from a registry definition."""
+        async def _scraper(upc: str) -> Dict[str, Any]:
+            return await self._registry_scrape(source_def, upc)
+        return _scraper
+    
+    async def _registry_scrape(self, source_def: Dict[str, Any], upc: str) -> Dict[str, Any]:
+        """Dynamic scraper for registry-defined sources."""
+        import json
+        from bs4 import BeautifulSoup
+        
+        source_name = source_def.get("name", "Unknown")
+        source_type = source_def.get("type", "html")
+        url_template = source_def.get("url_template", "")
+        method = source_def.get("method", "GET")
+        timeout = source_def.get("timeout", 10)
+        
+        if not url_template:
+            return self._fail(source_name, "", {}, "No URL template")
+        
+        # Build URL
+        url = url_template.replace("{upc}", upc)
+        
+        # Handle auth placeholders
+        requires_auth = source_def.get("requires_auth")
+        if requires_auth and "{" in url:
+            api_key = os.environ.get(requires_auth, "")
+            if not api_key:
+                return self._fail(source_name, url, {}, f"Auth key {requires_auth} not configured")
+            url = url.replace(f"{{{requires_auth}}}", api_key)
+        
+        # Make request
+        headers = self._next_headers()
+        try:
+            if method.upper() == "GET":
+                response = await self._get_with_retry(url, headers=headers, timeout=timeout)
+            else:
+                response = await self._get_with_retry(url, headers=headers, timeout=timeout)
+            
+            data = response.json() if source_type == "api" else None
+        except Exception as e:
+            return self._fail(source_name, url, {}, str(e))
+        
+        # Extract data based on type
+        if source_type == "api":
+            return self._extract_api_data(source_def, data, upc, url)
+        else:
+            return self._extract_html_data(source_def, response.text, upc, url)
+    
+    def _extract_api_data(self, source_def: Dict[str, Any], data: Dict, upc: str, url: str) -> Dict[str, Any]:
+        """Extract structured data from JSON API response."""
+        source_name = source_def.get("name", "Unknown")
+        extract = source_def.get("extract", {})
+        
+        def get_nested(data, path):
+            """Safely navigate nested dict/list structure."""
+            current = data
+            for key in path:
+                if current is None:
+                    return None
+                if isinstance(current, dict):
+                    current = current.get(key)
+                elif isinstance(current, list) and isinstance(key, int) and key < len(current):
+                    current = current[key]
+                else:
+                    return None
+            return current
+        
+        name = get_nested(data, extract.get("name", []))
+        brand = get_nested(data, extract.get("brand", []))
+        category = get_nested(data, extract.get("category", []))
+        description = get_nested(data, extract.get("description", []))
+        image_urls_raw = get_nested(data, extract.get("image_urls", []))
+        
+        # Handle image URLs (could be string, list, or dict)
+        image_urls = []
+        if isinstance(image_urls_raw, str):
+            image_urls = [image_urls_raw] if _is_valid_image_url(image_urls_raw) else []
+        elif isinstance(image_urls_raw, list):
+            image_urls = [u for u in image_urls_raw if _is_valid_image_url(u)]
+        elif isinstance(image_urls_raw, dict):
+            # Sometimes images are in a dict with keys
+            for v in image_urls_raw.values():
+                if isinstance(v, str) and _is_valid_image_url(v):
+                    image_urls.append(v)
+        
+        # Extract attributes
+        attributes = {}
+        attrs_def = extract.get("attributes", [])
+        if attrs_def:
+            attrs_data = get_nested(data, attrs_def)
+            if isinstance(attrs_data, dict):
+                attributes = attrs_data
+        
+        # Check success condition
+        success_condition = source_def.get("success_condition")
+        if success_condition:
+            condition_field = success_condition[0]
+            condition_value = success_condition[1]
+            actual_value = get_nested(data, [condition_field])
+            if actual_value != condition_value:
+                return self._fail(source_name, url, data, f"Success condition not met: {condition_field}={actual_value}")
+        
+        if not name:
+            return self._fail(source_name, url, data, "Product not found")
+        
+        return {
+            "upc": upc, "source": source_name, "source_url": url,
+            "name": name, "brand": brand, "category": category,
+            "description": description, "image_urls": image_urls,
+            "attributes": attributes, "raw": data,
+            "success": True, "error": None,
+        }
+    
+    def _extract_html_data(self, source_def: Dict[str, Any], html: str, upc: str, url: str) -> Dict[str, Any]:
+        """Extract data from HTML response using CSS selectors."""
+        source_name = source_def.get("name", "Unknown")
+        selectors = source_def.get("selectors", {})
+        
+        soup = BeautifulSoup(html, "html.parser")
+        
+        def extract_field(selector_list):
+            """Try multiple selectors until one finds content."""
+            if not selector_list:
+                return None
+            for selector in selector_list:
+                try:
+                    # Handle attribute selectors like meta[property='og:title']
+                    if "[" in selector and "=" in selector:
+                        tag = selector.split("[")[0]
+                        attr_part = selector.split("[", 1)[1].rstrip("]")
+                        if "=" in attr_part:
+                            attr_name, attr_value = attr_part.split("=", 1)
+                            attr_value = attr_value.strip("'\"")
+                            elem = soup.find(tag, {attr_name: attr_value})
+                            if elem:
+                                content = elem.get("content") or elem.get_text(strip=True)
+                                if content:
+                                    return content
+                    else:
+                        # Standard CSS selector
+                        elem = soup.select_one(selector)
+                        if elem:
+                            text = elem.get_text(strip=True)
+                            if text:
+                                return text
+                            # Try src for images
+                            src = elem.get("src")
+                            if src:
+                                return src
+                except Exception:
+                    continue
+            return None
+        
+        name = extract_field(selectors.get("name", []))
+        brand = extract_field(selectors.get("brand", []))
+        description = extract_field(selectors.get("description", []))
+        image_url = extract_field(selectors.get("image_urls", []))
+        
+        image_urls = []
+        if image_url and _is_valid_image_url(image_url):
+            image_urls = [image_url]
+        
+        # Extract attributes from table rows
+        attributes = {}
+        attr_selectors = selectors.get("attributes", [])
+        for attr_selector in attr_selectors:
+            try:
+                table = soup.select_one(attr_selector)
+                if table:
+                    for row in table.find_all("tr"):
+                        cells = row.find_all(["td", "th"])
+                        if len(cells) >= 2:
+                            key = cells[0].get_text(strip=True).lower().replace(":", "").replace(" ", "_")
+                            val = cells[1].get_text(strip=True)
+                            if key and val:
+                                attributes[key] = val
+            except Exception:
+                pass
+        
+        if not name:
+            return self._fail(source_name, url, {}, "Product not found")
+        
+        return {
+            "upc": upc, "source": source_name, "source_url": url,
+            "name": name, "brand": brand, "category": None,
+            "description": description, "image_urls": image_urls,
+            "attributes": attributes, "raw": {"html_snippet": soup.get_text()[:500]},
+            "success": True, "error": None,
+        }
 
     async def _safe_scrape(self, name: str, scrape_fn, upc: str) -> Dict[str, Any]:
         """Wrap scraper in circuit breaker + try/except + timing."""

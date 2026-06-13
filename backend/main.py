@@ -494,6 +494,13 @@ async def stream_job_status(job_id: str):
 @app.get("/api/health")
 async def health_check():
     fiq_health = foundry_iq.health() if foundry_iq else {"status": "unavailable"}
+    # Dynamically count registry sources
+    try:
+        from backend.scraper_registry import ScraperRegistry
+        registry = ScraperRegistry()
+        registry_count = registry.get_source_count()
+    except Exception:
+        registry_count = 0
     return {
         "status": "healthy",
         "version": "1.2.0",
@@ -504,7 +511,12 @@ async def health_check():
             "foundry_mode": fiq_health.get("mode", "unknown"),
             "caching": True,
         },
-        "scrapers": list(SOURCE_WEIGHTS.keys()),
+        "scrapers": {
+            "core": len(SOURCE_WEIGHTS),
+            "registry": registry_count,
+            "total": len(SOURCE_WEIGHTS) + registry_count,
+            "names": list(SOURCE_WEIGHTS.keys())[:10],  # First 10 names
+        },
         "cache": upc_cache.stats(),
         "foundry_iq": fiq_health,
     }

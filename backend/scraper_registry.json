@@ -1,0 +1,1647 @@
+{
+  "description": "ShelfWise Scraper Registry - Configurable source definitions for UPC product lookup. Add new sources by adding entries to this file. Each entry defines a scraper that can extract product data from a specific API or website.",
+  "version": "1.0",
+  "sources": [
+    {
+      "name": "Open Food Facts",
+      "type": "api",
+      "weight": 0.90,
+      "url_template": "https://world.openfoodfacts.org/api/v2/product/{upc}.json",
+      "method": "GET",
+      "timeout": 12,
+      "extract": {
+        "name": ["product", "product_name"],
+        "brand": ["product", "brands"],
+        "category": ["product", "categories"],
+        "description": ["product", "generic_name"],
+        "image_urls": ["product", "image_url"],
+        "attributes": ["product", "nutriments"]
+      },
+      "success_condition": ["status", 1]
+    },
+    {
+      "name": "UPCItemDB",
+      "type": "api",
+      "weight": 0.85,
+      "url_template": "https://api.upcitemdb.com/prod/trial/lookup?upc={upc}",
+      "method": "GET",
+      "timeout": 12,
+      "extract": {
+        "name": ["items", 0, "title"],
+        "brand": ["items", 0, "brand"],
+        "category": ["items", 0, "category"],
+        "description": ["items", 0, "description"],
+        "image_urls": ["items", 0, "images"],
+        "attributes": ["items", 0, "color"]
+      }
+    },
+    {
+      "name": "BarcodeLookup",
+      "type": "html",
+      "weight": 0.75,
+      "url_template": "https://www.barcodelookup.com/{upc}",
+      "method": "GET",
+      "timeout": 12,
+      "selectors": {
+        "name": ["h1.product-name", "title"],
+        "brand": ["span.product-brand"],
+        "description": ["div.product-description"],
+        "image_urls": ["img.product-image"],
+        "attributes": ["table.product-details"]
+      }
+    },
+    {
+      "name": "Go-UPC",
+      "type": "html",
+      "weight": 0.70,
+      "url_template": "https://go-upc.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 12,
+      "selectors": {
+        "name": ["h1.product-name", "h1"],
+        "brand": ["span.product-brand"],
+        "description": ["div.product-description"],
+        "image_urls": ["img.product-image"]
+      }
+    },
+    {
+      "name": "Buycott",
+      "type": "html",
+      "weight": 0.65,
+      "url_template": "https://www.buycott.com/upc/{upc}",
+      "method": "GET",
+      "timeout": 12,
+      "selectors": {
+        "name": ["meta[property='og:title']", "h1"],
+        "description": ["meta[property='og:description']"],
+        "image_urls": ["meta[property='og:image']"]
+      }
+    },
+    {
+      "name": "EANdata",
+      "type": "html",
+      "weight": 0.60,
+      "url_template": "https://eandata.com/lookup/{upc}",
+      "method": "GET",
+      "timeout": 12,
+      "selectors": {
+        "name": ["h1"],
+        "brand": ["td:contains('Brand') + td"],
+        "attributes": ["div.product-details"]
+      }
+    },
+    {
+      "name": "Lookify",
+      "type": "html",
+      "weight": 0.55,
+      "url_template": "https://lookify.io/barcode/{upc}",
+      "method": "GET",
+      "timeout": 12,
+      "selectors": {
+        "name": ["h1"],
+        "brand": ["span.brand"],
+        "image_urls": ["img.product"]
+      }
+    },
+    {
+      "name": "UPCDatabase",
+      "type": "html",
+      "weight": 0.50,
+      "url_template": "https://upcdatabase.org/code/{upc}",
+      "method": "GET",
+      "timeout": 12,
+      "selectors": {
+        "name": ["h1"],
+        "brand": ["td:contains('Brand') + td"],
+        "attributes": ["table"]
+      }
+    },
+    {
+      "name": "Buyaka",
+      "type": "html",
+      "weight": 0.50,
+      "url_template": "https://buyaka.com/{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": ["h1"],
+        "brand": [".brand"]
+      }
+    },
+    {
+      "name": "CheckDigit",
+      "type": "html",
+      "weight": 0.45,
+      "url_template": "https://checkdigit.com/upc/{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": ["h1"],
+        "brand": [".brand"]
+      }
+    },
+    {
+      "name": "UPCIndex",
+      "type": "html",
+      "weight": 0.45,
+      "url_template": "https://www.upcindex.com/{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": ["h1"],
+        "brand": ["td:contains('Brand') + td"],
+        "description": ["div.description"]
+      }
+    },
+    {
+      "name": "UPC-A",
+      "type": "html",
+      "weight": 0.45,
+      "url_template": "https://upc-a.com/{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": ["h1"],
+        "brand": [".brand"]
+      }
+    },
+    {
+      "name": "Barcodespider",
+      "type": "html",
+      "weight": 0.45,
+      "url_template": "https://www.barcodespider.com/{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": ["h1"],
+        "brand": ["td:contains('Brand') + td"],
+        "description": ["div.description"]
+      }
+    },
+    {
+      "name": "SearchUPC",
+      "type": "html",
+      "weight": 0.40,
+      "url_template": "https://searchupc.com/{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": ["h1"],
+        "brand": [".brand"]
+      }
+    },
+    {
+      "name": "UPCMap",
+      "type": "html",
+      "weight": 0.40,
+      "url_template": "https://upcmap.com/{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": ["h1"],
+        "brand": [".brand"]
+      }
+    },
+    {
+      "name": "UPCZilla",
+      "type": "html",
+      "weight": 0.40,
+      "url_template": "https://upczilla.com/{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": ["h1"],
+        "brand": [".brand"]
+      }
+    },
+    {
+      "name": "RedLaser",
+      "type": "api",
+      "weight": 0.40,
+      "url_template": "https://redlaser.com/api/products/{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "extract": {
+        "name": ["product", "name"],
+        "brand": ["product", "brand"]
+      }
+    },
+    {
+      "name": "ShopSavvy",
+      "type": "api",
+      "weight": 0.40,
+      "url_template": "https://api.shopsavvy.com/products/{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "extract": {
+        "name": ["product", "name"],
+        "brand": ["product", "brand"]
+      }
+    },
+    {
+      "name": "Out of Milk",
+      "type": "api",
+      "weight": 0.40,
+      "url_template": "https://api.outofmilk.com/products/{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "extract": {
+        "name": ["product", "name"],
+        "brand": ["product", "brand"]
+      }
+    },
+    {
+      "name": "ScanLife",
+      "type": "api",
+      "weight": 0.40,
+      "url_template": "https://api.scanlife.com/products/{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "extract": {
+        "name": ["product", "name"],
+        "brand": ["product", "brand"]
+      }
+    },
+    {
+      "name": "Scandit",
+      "type": "api",
+      "weight": 0.40,
+      "url_template": "https://api.scandit.com/products/{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "extract": {
+        "name": ["product", "name"],
+        "brand": ["product", "brand"]
+      }
+    },
+    {
+      "name": "Grocery Gateway",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://grocerygateway.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Giant Eagle",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://gianteagle.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Kroger",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.kroger.com/search?query={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": ["[data-testid='product-title']"],
+        "brand": ["[data-testid='product-brand']"]
+      }
+    },
+    {
+      "name": "Walmart",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.walmart.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": ["[data-automation-id='product-title']"],
+        "brand": ["[data-automation-id='product-brand']"]
+      }
+    },
+    {
+      "name": "Target",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.target.com/s?searchTerm={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": ["[data-test='product-title']"],
+        "brand": ["[data-test='product-brand']"]
+      }
+    },
+    {
+      "name": "Amazon",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.amazon.com/s?k={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": ["h2.a-size-mini span"],
+        "brand": [".a-size-base-plus"]
+      }
+    },
+    {
+      "name": "eBay",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.ebay.com/sch/i.html?_nkw={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".s-item__title"],
+        "brand": [".s-item__subtitle"]
+      }
+    },
+    {
+      "name": "Best Buy",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.bestbuy.com/site/searchpage.jsp?st={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".sr-item-title-label"],
+        "brand": [".sr-item-brand"]
+      }
+    },
+    {
+      "name": "Home Depot",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.homedepot.com/s/{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Lowe's",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.lowes.com/search?searchTerm={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": ["[data-testid='product-title']"],
+        "brand": ["[data-testid='product-brand']"]
+      }
+    },
+    {
+      "name": "Costco",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.costco.com/CatalogSearch?dept=All&keyword={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".description"],
+        "brand": [".brand"]
+      }
+    },
+    {
+      "name": "Sam's Club",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.samsclub.com/s/{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "BJ's Wholesale",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.bjs.com/search/{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Walgreens",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.walgreens.com/search/results.jsp?Ntt={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "CVS",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.cvs.com/search?searchTerm={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Rite Aid",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.riteaid.com/shop/search?searchTerm={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Albertsons",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.albertsons.com/search?searchTerm={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Safeway",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.safeway.com/shop/search-results.html?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Publix",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.publix.com/search?searchTerm={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Wegmans",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.wegmans.com/search?searchTerm={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "H-E-B",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.heb.com/search/?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Whole Foods",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.wholefoodsmarket.com/search?text={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Trader Joe's",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.traderjoes.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Sprouts",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.sprouts.com/search?searchTerm={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "FreshDirect",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.freshdirect.com/search?searchTerm={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Instacart",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.instacart.com/store/search?query={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Shipt",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.shipt.com/shop/search?query={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Google Shopping",
+      "type": "search",
+      "weight": 0.30,
+      "url_template": "https://www.google.com/search?tbm=shop&q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": ["h3"],
+        "brand": [".sh-dgr__grid-result__brand"]
+      }
+    },
+    {
+      "name": "Bing Shopping",
+      "type": "search",
+      "weight": 0.30,
+      "url_template": "https://www.bing.com/shop?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".br-mainheading"],
+        "brand": [".br-pdItemName"]
+      }
+    },
+    {
+      "name": "DuckDuckGo Shopping",
+      "type": "search",
+      "weight": 0.30,
+      "url_template": "https://duckduckgo.com/?q={upc}+product&ia=shopping",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": ["h2"],
+        "brand": [".result__a"]
+      }
+    },
+    {
+      "name": "Yahoo Shopping",
+      "type": "search",
+      "weight": 0.30,
+      "url_template": "https://shopping.yahoo.com/search?p={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".ProductTitle"],
+        "brand": [".ProductBrand"]
+      }
+    },
+    {
+      "name": "Shopping.com",
+      "type": "search",
+      "weight": 0.30,
+      "url_template": "https://www.shopping.com/search?k={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "PriceGrabber",
+      "type": "search",
+      "weight": 0.30,
+      "url_template": "https://www.pricegrabber.com/search.php?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Nextag",
+      "type": "search",
+      "weight": 0.30,
+      "url_template": "https://www.nextag.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Shopzilla",
+      "type": "search",
+      "weight": 0.30,
+      "url_template": "https://www.shopzilla.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "TheFind",
+      "type": "search",
+      "weight": 0.30,
+      "url_template": "https://www.thefind.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Kelkoo",
+      "type": "search",
+      "weight": 0.30,
+      "url_template": "https://www.kelkoo.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Idealo",
+      "type": "search",
+      "weight": 0.30,
+      "url_template": "https://www.idealo.com/preisvergleich/MainSearchProductCategory.html?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "MySimon",
+      "type": "search",
+      "weight": 0.30,
+      "url_template": "https://www.mysimon.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Froogle",
+      "type": "search",
+      "weight": 0.30,
+      "url_template": "https://froogle.google.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": ["h3"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Amazon Product API",
+      "type": "api",
+      "weight": 0.60,
+      "url_template": "https://api.amazon.com/products/{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "requires_auth": "AMAZON_API_KEY",
+      "extract": {
+        "name": ["product", "title"],
+        "brand": ["product", "brand"],
+        "category": ["product", "category"],
+        "description": ["product", "description"],
+        "image_urls": ["product", "images"],
+        "attributes": ["product", "attributes"]
+      }
+    },
+    {
+      "name": "eBay Product API",
+      "type": "api",
+      "weight": 0.55,
+      "url_template": "https://api.ebay.com/buy/browse/v1/item_summary/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "requires_auth": "EBAY_API_KEY",
+      "extract": {
+        "name": ["itemSummaries", 0, "title"],
+        "brand": ["itemSummaries", 0, "brand"],
+        "category": ["itemSummaries", 0, "category"],
+        "description": ["itemSummaries", 0, "description"],
+        "image_urls": ["itemSummaries", 0, "image"],
+        "attributes": ["itemSummaries", 0, "attributes"]
+      }
+    },
+    {
+      "name": "Walmart Product API",
+      "type": "api",
+      "weight": 0.55,
+      "url_template": "https://developer.api.walmart.com/api-proxy/service/ItemModule/v1/items?upc={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "requires_auth": "WALMART_API_KEY",
+      "extract": {
+        "name": ["items", 0, "name"],
+        "brand": ["items", 0, "brandName"],
+        "category": ["items", 0, "categoryPath"],
+        "description": ["items", 0, "shortDescription"],
+        "image_urls": ["items", 0, "image"],
+        "attributes": ["items", 0, "attributes"]
+      }
+    },
+    {
+      "name": "Target Product API",
+      "type": "api",
+      "weight": 0.55,
+      "url_template": "https://redsky.target.com/redsky_aggregations/v1/redsky/collections?upc={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "extract": {
+        "name": ["products", 0, "item", "product_description", "title"],
+        "brand": ["products", 0, "item", "product_description", "brand_name"],
+        "category": ["products", 0, "item", "product_description", "general_description"],
+        "description": ["products", 0, "item", "product_description", "description"],
+        "image_urls": ["products", 0, "item", "enrichment", "images"],
+        "attributes": ["products", 0, "item", "product_description"]
+      }
+    },
+    {
+      "name": "Best Buy Product API",
+      "type": "api",
+      "weight": 0.55,
+      "url_template": "https://api.bestbuy.com/v1/products(upc={upc})?api_key={BEST_BUY_API_KEY}&format=json",
+      "method": "GET",
+      "timeout": 10,
+      "requires_auth": "BEST_BUY_API_KEY",
+      "extract": {
+        "name": ["products", 0, "name"],
+        "brand": ["products", 0, "manufacturer"],
+        "category": ["products", 0, "categoryPath"],
+        "description": ["products", 0, "description"],
+        "image_urls": ["products", 0, "image"],
+        "attributes": ["products", 0, "features"]
+      }
+    },
+    {
+      "name": "Home Depot Product API",
+      "type": "api",
+      "weight": 0.55,
+      "url_template": "https://api.homedepot.com/v1/products?upc={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "requires_auth": "HOME_DEPOT_API_KEY",
+      "extract": {
+        "name": ["products", 0, "name"],
+        "brand": ["products", 0, "brand"],
+        "category": ["products", 0, "category"],
+        "description": ["products", 0, "description"],
+        "image_urls": ["products", 0, "images"],
+        "attributes": ["products", 0, "attributes"]
+      }
+    },
+    {
+      "name": "Google Custom Search",
+      "type": "api",
+      "weight": 0.50,
+      "url_template": "https://www.googleapis.com/customsearch/v1?key={GOOGLE_API_KEY}&cx={GOOGLE_CX}&q={upc}&num=5",
+      "method": "GET",
+      "timeout": 10,
+      "requires_auth": "GOOGLE_API_KEY",
+      "extract": {
+        "name": ["items", 0, "title"],
+        "brand": ["items", 0, "pagemap", "metatags", 0, "og:brand"],
+        "category": ["items", 0, "pagemap", "metatags", 0, "og:category"],
+        "description": ["items", 0, "snippet"],
+        "image_urls": ["items", 0, "pagemap", "cse_image", 0, "src"],
+        "attributes": ["items", 0, "pagemap"]
+      }
+    },
+    {
+      "name": "Bing Search API",
+      "type": "api",
+      "weight": 0.50,
+      "url_template": "https://api.bing.microsoft.com/v7.0/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "requires_auth": "BING_API_KEY",
+      "extract": {
+        "name": ["webPages", "value", 0, "name"],
+        "brand": ["webPages", "value", 0, "pagemap", "metatags", 0, "og:brand"],
+        "category": ["webPages", "value", 0, "pagemap", "metatags", 0, "og:category"],
+        "description": ["webPages", "value", 0, "snippet"],
+        "image_urls": ["webPages", "value", 0, "pagemap", "cse_image", 0, "src"],
+        "attributes": ["webPages", "value", 0, "pagemap"]
+      }
+    },
+    {
+      "name": "Brave Search API",
+      "type": "api",
+      "weight": 0.45,
+      "url_template": "https://api.search.brave.com/res/v1/web/search?q={upc}&count=5",
+      "method": "GET",
+      "timeout": 10,
+      "requires_auth": "BRAVE_API_KEY",
+      "extract": {
+        "name": ["web", "results", 0, "title"],
+        "description": ["web", "results", 0, "description"],
+        "attributes": ["web", "results"]
+      }
+    },
+    {
+      "name": "DuckDuckGo API",
+      "type": "api",
+      "weight": 0.45,
+      "url_template": "https://api.duckduckgo.com/?q={upc}&format=json",
+      "method": "GET",
+      "timeout": 10,
+      "extract": {
+        "name": ["RelatedTopics", 0, "Text"],
+        "description": ["AbstractText"],
+        "attributes": ["RelatedTopics"]
+      }
+    },
+    {
+      "name": "SerpAPI",
+      "type": "api",
+      "weight": 0.50,
+      "url_template": "https://serpapi.com/search.json?q={upc}&api_key={SERPAPI_KEY}&engine=google",
+      "method": "GET",
+      "timeout": 10,
+      "requires_auth": "SERPAPI_KEY",
+      "extract": {
+        "name": ["organic_results", 0, "title"],
+        "brand": ["organic_results", 0, "pagemap", "metatags", 0, "og:brand"],
+        "category": ["organic_results", 0, "pagemap", "metatags", 0, "og:category"],
+        "description": ["organic_results", 0, "snippet"],
+        "image_urls": ["organic_results", 0, "pagemap", "cse_image", 0, "src"],
+        "attributes": ["organic_results", 0, "pagemap"]
+      }
+    },
+    {
+      "name": "RapidAPI UPC",
+      "type": "api",
+      "weight": 0.50,
+      "url_template": "https://upc-lookup.p.rapidapi.com/{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "requires_auth": "RAPIDAPI_KEY",
+      "extract": {
+        "name": ["product", "name"],
+        "brand": ["product", "brand"],
+        "category": ["product", "category"],
+        "description": ["product", "description"],
+        "image_urls": ["product", "images"],
+        "attributes": ["product", "attributes"]
+      }
+    },
+    {
+      "name": "RapidAPI Barcode",
+      "type": "api",
+      "weight": 0.50,
+      "url_template": "https://barcode-lookup.p.rapidapi.com/{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "requires_auth": "RAPIDAPI_KEY",
+      "extract": {
+        "name": ["product", "name"],
+        "brand": ["product", "brand"],
+        "category": ["product", "category"],
+        "description": ["product", "description"],
+        "image_urls": ["product", "images"],
+        "attributes": ["product", "attributes"]
+      }
+    },
+    {
+      "name": "Rakuten",
+      "type": "api",
+      "weight": 0.40,
+      "url_template": "https://api.rakuten.com/products/{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "extract": {
+        "name": ["product", "name"],
+        "brand": ["product", "brand"],
+        "category": ["product", "category"],
+        "description": ["product", "description"],
+        "image_urls": ["product", "images"],
+        "attributes": ["product", "attributes"]
+      }
+    },
+    {
+      "name": "Newegg",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.newegg.com/p/pl?d={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".item-title"],
+        "brand": [".item-brand"]
+      }
+    },
+    {
+      "name": "Overstock",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.overstock.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Wayfair",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.wayfair.com/keyword.php?keyword={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".ProductCard-title"],
+        "brand": [".ProductCard-brand"]
+      }
+    },
+    {
+      "name": "Jet",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://jet.com/search?term={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Boxed",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.boxed.com/product/{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": ["h1"],
+        "brand": [".brand"]
+      }
+    },
+    {
+      "name": "Thrive Market",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://thrivemarket.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Vitacost",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.vitacost.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "iHerb",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.iherb.com/search?kw={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Swanson Health",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.swansonvitamins.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Puritan's Pride",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.puritan.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "LuckyVitamin",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.luckyvitamin.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Drugstore.com",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.drugstore.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Soap.com",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.soap.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Beauty.com",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.beauty.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Diapers.com",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.diapers.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Yoyo.com",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.yoyo.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Wag.com",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.wag.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Casa.com",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.casa.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Afterschool.com",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.afterschool.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Vine.com",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.vine.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "BookDepository",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.bookdepository.com/search?searchTerm={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".item-info"],
+        "brand": [".author"]
+      }
+    },
+    {
+      "name": "Alibris",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.alibris.com/search/books/isbn/{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".book-title"],
+        "brand": [".author"]
+      }
+    },
+    {
+      "name": "AbeBooks",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.abebooks.com/servlet/SearchResults?an={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".book-title"],
+        "brand": [".author"]
+      }
+    },
+    {
+      "name": "ThriftBooks",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.thriftbooks.com/browse/?b.search={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".AllEditionsItem-title"],
+        "brand": [".author"]
+      }
+    },
+    {
+      "name": "BetterWorldBooks",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.betterworldbooks.com/search/results?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".book-title"],
+        "brand": [".author"]
+      }
+    },
+    {
+      "name": "Powells",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.powells.com/search?keyword={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".book-title"],
+        "brand": [".author"]
+      }
+    },
+    {
+      "name": "Barnes & Noble",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.barnesandnoble.com/s/{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".pdp-header-title"],
+        "brand": [".pdp-header-author"]
+      }
+    },
+    {
+      "name": "Staples",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.staples.com/{upc}/directory_{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Office Depot",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.officedepot.com/catalog/search.do?Ntt={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "OfficeMax",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.officemax.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Quill",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.quill.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "CDW",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.cdw.com/search/?key={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".search-result-title"],
+        "brand": [".search-result-brand"]
+      }
+    },
+    {
+      "name": "TigerDirect",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.tigerdirect.com/applications/search/search.asp?keywords={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "MacMall",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.macmall.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Adorama",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.adorama.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "B&H Photo",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.bhphotovideo.com/c/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".prd-title"],
+        "brand": [".prd-brand"]
+      }
+    },
+    {
+      "name": "Crutchfield",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.crutchfield.com/g_654/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Musician's Friend",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.musiciansfriend.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Sweetwater",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.sweetwater.com/search.php?s={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Guitar Center",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.guitarcenter.com/search?query={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Sam Ash",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.samash.com/search?query={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Zzounds",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.zzounds.com/search?query={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "American Musical",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.americanmusical.com/search?query={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Full Compass",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.fullcompass.com/search?query={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Reverb",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://reverb.com/marketplace?query={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".product-title"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Etsy",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.etsy.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [".v2-listing-card__title"],
+        "brand": [".v2-listing-card__shop"]
+      }
+    },
+    {
+      "name": "Shopify Stores",
+      "type": "search",
+      "weight": 0.30,
+      "url_template": "https://www.google.com/search?q=shopify+{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": ["h3"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "BigCommerce Stores",
+      "type": "search",
+      "weight": 0.30,
+      "url_template": "https://www.google.com/search?q=bigcommerce+{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": ["h3"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "WooCommerce Stores",
+      "type": "search",
+      "weight": 0.30,
+      "url_template": "https://www.google.com/search?q=woocommerce+{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": ["h3"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Magento Stores",
+      "type": "search",
+      "weight": 0.30,
+      "url_template": "https://www.google.com/search?q=magento+{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": ["h3"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "PrestaShop Stores",
+      "type": "search",
+      "weight": 0.30,
+      "url_template": "https://www.google.com/search?q=prestashop+{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": ["h3"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "OpenCart Stores",
+      "type": "search",
+      "weight": 0.30,
+      "url_template": "https://www.google.com/search?q=opencart+{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": ["h3"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Squarespace Stores",
+      "type": "search",
+      "weight": 0.30,
+      "url_template": "https://www.google.com/search?q=squarespace+{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": ["h3"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Wix Stores",
+      "type": "search",
+      "weight": 0.30,
+      "url_template": "https://www.google.com/search?q=wix+{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": ["h3"],
+        "brand": [".product-brand"]
+      }
+    },
+    {
+      "name": "Weebly Stores",
+      "type": "search",
+      "weight": 0.30,
+      "url_template": "https://www.google.com/search?q=weebly+{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": ["h3"],
+        "brand": [".product-brand"]
+      }
+    }
+  ]
+}
