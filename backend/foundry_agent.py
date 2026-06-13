@@ -126,15 +126,8 @@ class ProductReasoningAgent:
         trace = [f"Starting consolidation for UPC {upc}"]
 
         if not raw_data_list:
-            trace.append("No raw data available - returning error record")
-            return {
-                "upc": upc, "name": f"Unknown Product ({upc})",
-                "brand": None, "category": None,
-                "description": f"No product information could be found for UPC {upc}.",
-                "image_url": None, "images": [], "attributes": {},
-                "confidence": 0.0, "status": "error",
-                "citations": [], "reasoning_trace": trace,
-            }
+            trace.append("No scraper data found — will attempt Foundry LLM enrichment from UPC alone")
+            raw_data_list = []
 
         # Step 1: Weight and filter sources
         weighted = self._weight_sources(raw_data_list)
@@ -203,8 +196,16 @@ class ProductReasoningAgent:
                     description = llm_data["description"]
                 if llm_data.get("attributes") and isinstance(llm_data["attributes"], dict):
                     attributes.update(llm_data["attributes"])
-                confidence = min(1.0, confidence + 0.15)
-                trace.append("Foundry enriched fields merged")
+                # If Foundry returns meaningful data, boost confidence and status
+                if name and brand and category:
+                    confidence = min(1.0, confidence + 0.25)
+                    if status == "error":
+                        status = "complete"
+                        trace.append("Status promoted from error to complete by Foundry LLM")
+                    trace.append("Foundry enriched fields merged — full product data from LLM")
+                else:
+                    confidence = min(1.0, confidence + 0.15)
+                    trace.append("Foundry enriched fields merged")
 
         return {
             "upc": upc, "name": name, "brand": brand, "category": category,
