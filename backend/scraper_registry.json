@@ -1,23 +1,44 @@
 {
   "description": "ShelfWise Scraper Registry - Configurable source definitions for UPC product lookup. Add new sources by adding entries to this file. Each entry defines a scraper that can extract product data from a specific API or website.",
-  "version": "1.0",
+  "version": "1.1",
   "sources": [
     {
       "name": "Open Food Facts",
       "type": "api",
-      "weight": 0.90,
+      "weight": 0.9,
       "url_template": "https://world.openfoodfacts.org/api/v2/product/{upc}.json",
       "method": "GET",
       "timeout": 12,
       "extract": {
-        "name": ["product", "product_name"],
-        "brand": ["product", "brands"],
-        "category": ["product", "categories"],
-        "description": ["product", "generic_name"],
-        "image_urls": ["product", "image_url"],
-        "attributes": ["product", "nutriments"]
+        "name": [
+          "product",
+          "product_name"
+        ],
+        "brand": [
+          "product",
+          "brands"
+        ],
+        "category": [
+          "product",
+          "categories"
+        ],
+        "description": [
+          "product",
+          "generic_name"
+        ],
+        "image_urls": [
+          "product",
+          "image_url"
+        ],
+        "attributes": [
+          "product",
+          "nutriments"
+        ]
       },
-      "success_condition": ["status", 1]
+      "success_condition": [
+        "status",
+        1
+      ]
     },
     {
       "name": "UPCItemDB",
@@ -27,12 +48,36 @@
       "method": "GET",
       "timeout": 12,
       "extract": {
-        "name": ["items", 0, "title"],
-        "brand": ["items", 0, "brand"],
-        "category": ["items", 0, "category"],
-        "description": ["items", 0, "description"],
-        "image_urls": ["items", 0, "images"],
-        "attributes": ["items", 0, "color"]
+        "name": [
+          "items",
+          0,
+          "title"
+        ],
+        "brand": [
+          "items",
+          0,
+          "brand"
+        ],
+        "category": [
+          "items",
+          0,
+          "category"
+        ],
+        "description": [
+          "items",
+          0,
+          "description"
+        ],
+        "image_urls": [
+          "items",
+          0,
+          "images"
+        ],
+        "attributes": [
+          "items",
+          0,
+          "color"
+        ]
       }
     },
     {
@@ -43,25 +88,45 @@
       "method": "GET",
       "timeout": 12,
       "selectors": {
-        "name": ["h1.product-name", "title"],
-        "brand": ["span.product-brand"],
-        "description": ["div.product-description"],
-        "image_urls": ["img.product-image"],
-        "attributes": ["table.product-details"]
+        "name": [
+          "h1.product-name",
+          "title"
+        ],
+        "brand": [
+          "span.product-brand"
+        ],
+        "description": [
+          "div.product-description"
+        ],
+        "image_urls": [
+          "img.product-image"
+        ],
+        "attributes": [
+          "table.product-details"
+        ]
       }
     },
     {
       "name": "Go-UPC",
       "type": "html",
-      "weight": 0.70,
+      "weight": 0.7,
       "url_template": "https://go-upc.com/search?q={upc}",
       "method": "GET",
       "timeout": 12,
       "selectors": {
-        "name": ["h1.product-name", "h1"],
-        "brand": ["span.product-brand"],
-        "description": ["div.product-description"],
-        "image_urls": ["img.product-image"]
+        "name": [
+          "h1.product-name",
+          "h1"
+        ],
+        "brand": [
+          "span.product-brand"
+        ],
+        "description": [
+          "div.product-description"
+        ],
+        "image_urls": [
+          "img.product-image"
+        ]
       }
     },
     {
@@ -72,22 +137,35 @@
       "method": "GET",
       "timeout": 12,
       "selectors": {
-        "name": ["meta[property='og:title']", "h1"],
-        "description": ["meta[property='og:description']"],
-        "image_urls": ["meta[property='og:image']"]
+        "name": [
+          "meta[property='og:title']",
+          "h1"
+        ],
+        "description": [
+          "meta[property='og:description']"
+        ],
+        "image_urls": [
+          "meta[property='og:image']"
+        ]
       }
     },
     {
       "name": "EANdata",
       "type": "html",
-      "weight": 0.60,
+      "weight": 0.6,
       "url_template": "https://eandata.com/lookup/{upc}",
       "method": "GET",
       "timeout": 12,
       "selectors": {
-        "name": ["h1"],
-        "brand": ["td:contains('Brand') + td"],
-        "attributes": ["div.product-details"]
+        "name": [
+          "h1"
+        ],
+        "brand": [
+          "td:contains('Brand') + td"
+        ],
+        "attributes": [
+          "div.product-details"
+        ]
       }
     },
     {
@@ -98,34 +176,50 @@
       "method": "GET",
       "timeout": 12,
       "selectors": {
-        "name": ["h1"],
-        "brand": ["span.brand"],
-        "image_urls": ["img.product"]
+        "name": [
+          "h1"
+        ],
+        "brand": [
+          "span.brand"
+        ],
+        "image_urls": [
+          "img.product"
+        ]
       }
     },
     {
       "name": "UPCDatabase",
       "type": "html",
-      "weight": 0.50,
+      "weight": 0.5,
       "url_template": "https://upcdatabase.org/code/{upc}",
       "method": "GET",
       "timeout": 12,
       "selectors": {
-        "name": ["h1"],
-        "brand": ["td:contains('Brand') + td"],
-        "attributes": ["table"]
+        "name": [
+          "h1"
+        ],
+        "brand": [
+          "td:contains('Brand') + td"
+        ],
+        "attributes": [
+          "table"
+        ]
       }
     },
     {
       "name": "Buyaka",
       "type": "html",
-      "weight": 0.50,
+      "weight": 0.5,
       "url_template": "https://buyaka.com/{upc}",
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": ["h1"],
-        "brand": [".brand"]
+        "name": [
+          "h1"
+        ],
+        "brand": [
+          ".brand"
+        ]
       }
     },
     {
@@ -136,8 +230,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": ["h1"],
-        "brand": [".brand"]
+        "name": [
+          "h1"
+        ],
+        "brand": [
+          ".brand"
+        ]
       }
     },
     {
@@ -148,9 +246,15 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": ["h1"],
-        "brand": ["td:contains('Brand') + td"],
-        "description": ["div.description"]
+        "name": [
+          "h1"
+        ],
+        "brand": [
+          "td:contains('Brand') + td"
+        ],
+        "description": [
+          "div.description"
+        ]
       }
     },
     {
@@ -161,8 +265,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": ["h1"],
-        "brand": [".brand"]
+        "name": [
+          "h1"
+        ],
+        "brand": [
+          ".brand"
+        ]
       }
     },
     {
@@ -173,105 +281,153 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": ["h1"],
-        "brand": ["td:contains('Brand') + td"],
-        "description": ["div.description"]
+        "name": [
+          "h1"
+        ],
+        "brand": [
+          "td:contains('Brand') + td"
+        ],
+        "description": [
+          "div.description"
+        ]
       }
     },
     {
       "name": "SearchUPC",
       "type": "html",
-      "weight": 0.40,
+      "weight": 0.4,
       "url_template": "https://searchupc.com/{upc}",
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": ["h1"],
-        "brand": [".brand"]
+        "name": [
+          "h1"
+        ],
+        "brand": [
+          ".brand"
+        ]
       }
     },
     {
       "name": "UPCMap",
       "type": "html",
-      "weight": 0.40,
+      "weight": 0.4,
       "url_template": "https://upcmap.com/{upc}",
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": ["h1"],
-        "brand": [".brand"]
+        "name": [
+          "h1"
+        ],
+        "brand": [
+          ".brand"
+        ]
       }
     },
     {
       "name": "UPCZilla",
       "type": "html",
-      "weight": 0.40,
+      "weight": 0.4,
       "url_template": "https://upczilla.com/{upc}",
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": ["h1"],
-        "brand": [".brand"]
+        "name": [
+          "h1"
+        ],
+        "brand": [
+          ".brand"
+        ]
       }
     },
     {
       "name": "RedLaser",
       "type": "api",
-      "weight": 0.40,
+      "weight": 0.4,
       "url_template": "https://redlaser.com/api/products/{upc}",
       "method": "GET",
       "timeout": 10,
       "extract": {
-        "name": ["product", "name"],
-        "brand": ["product", "brand"]
+        "name": [
+          "product",
+          "name"
+        ],
+        "brand": [
+          "product",
+          "brand"
+        ]
       }
     },
     {
       "name": "ShopSavvy",
       "type": "api",
-      "weight": 0.40,
+      "weight": 0.4,
       "url_template": "https://api.shopsavvy.com/products/{upc}",
       "method": "GET",
       "timeout": 10,
       "extract": {
-        "name": ["product", "name"],
-        "brand": ["product", "brand"]
+        "name": [
+          "product",
+          "name"
+        ],
+        "brand": [
+          "product",
+          "brand"
+        ]
       }
     },
     {
       "name": "Out of Milk",
       "type": "api",
-      "weight": 0.40,
+      "weight": 0.4,
       "url_template": "https://api.outofmilk.com/products/{upc}",
       "method": "GET",
       "timeout": 10,
       "extract": {
-        "name": ["product", "name"],
-        "brand": ["product", "brand"]
+        "name": [
+          "product",
+          "name"
+        ],
+        "brand": [
+          "product",
+          "brand"
+        ]
       }
     },
     {
       "name": "ScanLife",
       "type": "api",
-      "weight": 0.40,
+      "weight": 0.4,
       "url_template": "https://api.scanlife.com/products/{upc}",
       "method": "GET",
       "timeout": 10,
       "extract": {
-        "name": ["product", "name"],
-        "brand": ["product", "brand"]
+        "name": [
+          "product",
+          "name"
+        ],
+        "brand": [
+          "product",
+          "brand"
+        ]
       }
     },
     {
       "name": "Scandit",
       "type": "api",
-      "weight": 0.40,
+      "weight": 0.4,
       "url_template": "https://api.scandit.com/products/{upc}",
       "method": "GET",
       "timeout": 10,
       "extract": {
-        "name": ["product", "name"],
-        "brand": ["product", "brand"]
+        "name": [
+          "product",
+          "name"
+        ],
+        "brand": [
+          "product",
+          "brand"
+        ]
       }
     },
     {
@@ -282,8 +438,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -294,8 +454,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -306,8 +470,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": ["[data-testid='product-title']"],
-        "brand": ["[data-testid='product-brand']"]
+        "name": [
+          "[data-testid='product-title']"
+        ],
+        "brand": [
+          "[data-testid='product-brand']"
+        ]
       }
     },
     {
@@ -318,8 +486,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": ["[data-automation-id='product-title']"],
-        "brand": ["[data-automation-id='product-brand']"]
+        "name": [
+          "[data-automation-id='product-title']"
+        ],
+        "brand": [
+          "[data-automation-id='product-brand']"
+        ]
       }
     },
     {
@@ -330,8 +502,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": ["[data-test='product-title']"],
-        "brand": ["[data-test='product-brand']"]
+        "name": [
+          "[data-test='product-title']"
+        ],
+        "brand": [
+          "[data-test='product-brand']"
+        ]
       }
     },
     {
@@ -342,8 +518,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": ["h2.a-size-mini span"],
-        "brand": [".a-size-base-plus"]
+        "name": [
+          "h2.a-size-mini span"
+        ],
+        "brand": [
+          ".a-size-base-plus"
+        ]
       }
     },
     {
@@ -354,8 +534,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".s-item__title"],
-        "brand": [".s-item__subtitle"]
+        "name": [
+          ".s-item__title"
+        ],
+        "brand": [
+          ".s-item__subtitle"
+        ]
       }
     },
     {
@@ -366,8 +550,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".sr-item-title-label"],
-        "brand": [".sr-item-brand"]
+        "name": [
+          ".sr-item-title-label"
+        ],
+        "brand": [
+          ".sr-item-brand"
+        ]
       }
     },
     {
@@ -378,8 +566,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -390,8 +582,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": ["[data-testid='product-title']"],
-        "brand": ["[data-testid='product-brand']"]
+        "name": [
+          "[data-testid='product-title']"
+        ],
+        "brand": [
+          "[data-testid='product-brand']"
+        ]
       }
     },
     {
@@ -402,8 +598,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".description"],
-        "brand": [".brand"]
+        "name": [
+          ".description"
+        ],
+        "brand": [
+          ".brand"
+        ]
       }
     },
     {
@@ -414,8 +614,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -426,8 +630,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -438,8 +646,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -450,8 +662,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -462,8 +678,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -474,8 +694,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -486,8 +710,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -498,8 +726,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -510,8 +742,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -522,8 +758,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -534,8 +774,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -546,8 +790,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -558,8 +806,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -570,8 +822,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -582,8 +838,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -594,181 +854,255 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
       "name": "Google Shopping",
       "type": "search",
-      "weight": 0.30,
+      "weight": 0.3,
       "url_template": "https://www.google.com/search?tbm=shop&q={upc}",
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": ["h3"],
-        "brand": [".sh-dgr__grid-result__brand"]
+        "name": [
+          "h3"
+        ],
+        "brand": [
+          ".sh-dgr__grid-result__brand"
+        ]
       }
     },
     {
       "name": "Bing Shopping",
       "type": "search",
-      "weight": 0.30,
+      "weight": 0.3,
       "url_template": "https://www.bing.com/shop?q={upc}",
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".br-mainheading"],
-        "brand": [".br-pdItemName"]
+        "name": [
+          ".br-mainheading"
+        ],
+        "brand": [
+          ".br-pdItemName"
+        ]
       }
     },
     {
       "name": "DuckDuckGo Shopping",
       "type": "search",
-      "weight": 0.30,
+      "weight": 0.3,
       "url_template": "https://duckduckgo.com/?q={upc}+product&ia=shopping",
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": ["h2"],
-        "brand": [".result__a"]
+        "name": [
+          "h2"
+        ],
+        "brand": [
+          ".result__a"
+        ]
       }
     },
     {
       "name": "Yahoo Shopping",
       "type": "search",
-      "weight": 0.30,
+      "weight": 0.3,
       "url_template": "https://shopping.yahoo.com/search?p={upc}",
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".ProductTitle"],
-        "brand": [".ProductBrand"]
+        "name": [
+          ".ProductTitle"
+        ],
+        "brand": [
+          ".ProductBrand"
+        ]
       }
     },
     {
       "name": "Shopping.com",
       "type": "search",
-      "weight": 0.30,
+      "weight": 0.3,
       "url_template": "https://www.shopping.com/search?k={upc}",
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
       "name": "PriceGrabber",
       "type": "search",
-      "weight": 0.30,
+      "weight": 0.3,
       "url_template": "https://www.pricegrabber.com/search.php?q={upc}",
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
       "name": "Nextag",
       "type": "search",
-      "weight": 0.30,
+      "weight": 0.3,
       "url_template": "https://www.nextag.com/search?q={upc}",
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
       "name": "Shopzilla",
       "type": "search",
-      "weight": 0.30,
+      "weight": 0.3,
       "url_template": "https://www.shopzilla.com/search?q={upc}",
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
       "name": "TheFind",
       "type": "search",
-      "weight": 0.30,
+      "weight": 0.3,
       "url_template": "https://www.thefind.com/search?q={upc}",
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
       "name": "Kelkoo",
       "type": "search",
-      "weight": 0.30,
+      "weight": 0.3,
       "url_template": "https://www.kelkoo.com/search?q={upc}",
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
       "name": "Idealo",
       "type": "search",
-      "weight": 0.30,
+      "weight": 0.3,
       "url_template": "https://www.idealo.com/preisvergleich/MainSearchProductCategory.html?q={upc}",
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
       "name": "MySimon",
       "type": "search",
-      "weight": 0.30,
+      "weight": 0.3,
       "url_template": "https://www.mysimon.com/search?q={upc}",
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
       "name": "Froogle",
       "type": "search",
-      "weight": 0.30,
+      "weight": 0.3,
       "url_template": "https://froogle.google.com/search?q={upc}",
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": ["h3"],
-        "brand": [".product-brand"]
+        "name": [
+          "h3"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
       "name": "Amazon Product API",
       "type": "api",
-      "weight": 0.60,
+      "weight": 0.6,
       "url_template": "https://api.amazon.com/products/{upc}",
       "method": "GET",
       "timeout": 10,
       "requires_auth": "AMAZON_API_KEY",
       "extract": {
-        "name": ["product", "title"],
-        "brand": ["product", "brand"],
-        "category": ["product", "category"],
-        "description": ["product", "description"],
-        "image_urls": ["product", "images"],
-        "attributes": ["product", "attributes"]
+        "name": [
+          "product",
+          "title"
+        ],
+        "brand": [
+          "product",
+          "brand"
+        ],
+        "category": [
+          "product",
+          "category"
+        ],
+        "description": [
+          "product",
+          "description"
+        ],
+        "image_urls": [
+          "product",
+          "images"
+        ],
+        "attributes": [
+          "product",
+          "attributes"
+        ]
       }
     },
     {
@@ -780,12 +1114,36 @@
       "timeout": 10,
       "requires_auth": "EBAY_API_KEY",
       "extract": {
-        "name": ["itemSummaries", 0, "title"],
-        "brand": ["itemSummaries", 0, "brand"],
-        "category": ["itemSummaries", 0, "category"],
-        "description": ["itemSummaries", 0, "description"],
-        "image_urls": ["itemSummaries", 0, "image"],
-        "attributes": ["itemSummaries", 0, "attributes"]
+        "name": [
+          "itemSummaries",
+          0,
+          "title"
+        ],
+        "brand": [
+          "itemSummaries",
+          0,
+          "brand"
+        ],
+        "category": [
+          "itemSummaries",
+          0,
+          "category"
+        ],
+        "description": [
+          "itemSummaries",
+          0,
+          "description"
+        ],
+        "image_urls": [
+          "itemSummaries",
+          0,
+          "image"
+        ],
+        "attributes": [
+          "itemSummaries",
+          0,
+          "attributes"
+        ]
       }
     },
     {
@@ -797,12 +1155,36 @@
       "timeout": 10,
       "requires_auth": "WALMART_API_KEY",
       "extract": {
-        "name": ["items", 0, "name"],
-        "brand": ["items", 0, "brandName"],
-        "category": ["items", 0, "categoryPath"],
-        "description": ["items", 0, "shortDescription"],
-        "image_urls": ["items", 0, "image"],
-        "attributes": ["items", 0, "attributes"]
+        "name": [
+          "items",
+          0,
+          "name"
+        ],
+        "brand": [
+          "items",
+          0,
+          "brandName"
+        ],
+        "category": [
+          "items",
+          0,
+          "categoryPath"
+        ],
+        "description": [
+          "items",
+          0,
+          "shortDescription"
+        ],
+        "image_urls": [
+          "items",
+          0,
+          "image"
+        ],
+        "attributes": [
+          "items",
+          0,
+          "attributes"
+        ]
       }
     },
     {
@@ -813,12 +1195,47 @@
       "method": "GET",
       "timeout": 10,
       "extract": {
-        "name": ["products", 0, "item", "product_description", "title"],
-        "brand": ["products", 0, "item", "product_description", "brand_name"],
-        "category": ["products", 0, "item", "product_description", "general_description"],
-        "description": ["products", 0, "item", "product_description", "description"],
-        "image_urls": ["products", 0, "item", "enrichment", "images"],
-        "attributes": ["products", 0, "item", "product_description"]
+        "name": [
+          "products",
+          0,
+          "item",
+          "product_description",
+          "title"
+        ],
+        "brand": [
+          "products",
+          0,
+          "item",
+          "product_description",
+          "brand_name"
+        ],
+        "category": [
+          "products",
+          0,
+          "item",
+          "product_description",
+          "general_description"
+        ],
+        "description": [
+          "products",
+          0,
+          "item",
+          "product_description",
+          "description"
+        ],
+        "image_urls": [
+          "products",
+          0,
+          "item",
+          "enrichment",
+          "images"
+        ],
+        "attributes": [
+          "products",
+          0,
+          "item",
+          "product_description"
+        ]
       }
     },
     {
@@ -830,12 +1247,36 @@
       "timeout": 10,
       "requires_auth": "BEST_BUY_API_KEY",
       "extract": {
-        "name": ["products", 0, "name"],
-        "brand": ["products", 0, "manufacturer"],
-        "category": ["products", 0, "categoryPath"],
-        "description": ["products", 0, "description"],
-        "image_urls": ["products", 0, "image"],
-        "attributes": ["products", 0, "features"]
+        "name": [
+          "products",
+          0,
+          "name"
+        ],
+        "brand": [
+          "products",
+          0,
+          "manufacturer"
+        ],
+        "category": [
+          "products",
+          0,
+          "categoryPath"
+        ],
+        "description": [
+          "products",
+          0,
+          "description"
+        ],
+        "image_urls": [
+          "products",
+          0,
+          "image"
+        ],
+        "attributes": [
+          "products",
+          0,
+          "features"
+        ]
       }
     },
     {
@@ -847,46 +1288,142 @@
       "timeout": 10,
       "requires_auth": "HOME_DEPOT_API_KEY",
       "extract": {
-        "name": ["products", 0, "name"],
-        "brand": ["products", 0, "brand"],
-        "category": ["products", 0, "category"],
-        "description": ["products", 0, "description"],
-        "image_urls": ["products", 0, "images"],
-        "attributes": ["products", 0, "attributes"]
+        "name": [
+          "products",
+          0,
+          "name"
+        ],
+        "brand": [
+          "products",
+          0,
+          "brand"
+        ],
+        "category": [
+          "products",
+          0,
+          "category"
+        ],
+        "description": [
+          "products",
+          0,
+          "description"
+        ],
+        "image_urls": [
+          "products",
+          0,
+          "images"
+        ],
+        "attributes": [
+          "products",
+          0,
+          "attributes"
+        ]
       }
     },
     {
       "name": "Google Custom Search",
       "type": "api",
-      "weight": 0.50,
+      "weight": 0.5,
       "url_template": "https://www.googleapis.com/customsearch/v1?key={GOOGLE_API_KEY}&cx={GOOGLE_CX}&q={upc}&num=5",
       "method": "GET",
       "timeout": 10,
       "requires_auth": "GOOGLE_API_KEY",
       "extract": {
-        "name": ["items", 0, "title"],
-        "brand": ["items", 0, "pagemap", "metatags", 0, "og:brand"],
-        "category": ["items", 0, "pagemap", "metatags", 0, "og:category"],
-        "description": ["items", 0, "snippet"],
-        "image_urls": ["items", 0, "pagemap", "cse_image", 0, "src"],
-        "attributes": ["items", 0, "pagemap"]
+        "name": [
+          "items",
+          0,
+          "title"
+        ],
+        "brand": [
+          "items",
+          0,
+          "pagemap",
+          "metatags",
+          0,
+          "og:brand"
+        ],
+        "category": [
+          "items",
+          0,
+          "pagemap",
+          "metatags",
+          0,
+          "og:category"
+        ],
+        "description": [
+          "items",
+          0,
+          "snippet"
+        ],
+        "image_urls": [
+          "items",
+          0,
+          "pagemap",
+          "cse_image",
+          0,
+          "src"
+        ],
+        "attributes": [
+          "items",
+          0,
+          "pagemap"
+        ]
       }
     },
     {
       "name": "Bing Search API",
       "type": "api",
-      "weight": 0.50,
+      "weight": 0.5,
       "url_template": "https://api.bing.microsoft.com/v7.0/search?q={upc}",
       "method": "GET",
       "timeout": 10,
       "requires_auth": "BING_API_KEY",
       "extract": {
-        "name": ["webPages", "value", 0, "name"],
-        "brand": ["webPages", "value", 0, "pagemap", "metatags", 0, "og:brand"],
-        "category": ["webPages", "value", 0, "pagemap", "metatags", 0, "og:category"],
-        "description": ["webPages", "value", 0, "snippet"],
-        "image_urls": ["webPages", "value", 0, "pagemap", "cse_image", 0, "src"],
-        "attributes": ["webPages", "value", 0, "pagemap"]
+        "name": [
+          "webPages",
+          "value",
+          0,
+          "name"
+        ],
+        "brand": [
+          "webPages",
+          "value",
+          0,
+          "pagemap",
+          "metatags",
+          0,
+          "og:brand"
+        ],
+        "category": [
+          "webPages",
+          "value",
+          0,
+          "pagemap",
+          "metatags",
+          0,
+          "og:category"
+        ],
+        "description": [
+          "webPages",
+          "value",
+          0,
+          "snippet"
+        ],
+        "image_urls": [
+          "webPages",
+          "value",
+          0,
+          "pagemap",
+          "cse_image",
+          0,
+          "src"
+        ],
+        "attributes": [
+          "webPages",
+          "value",
+          0,
+          "pagemap"
+        ]
       }
     },
     {
@@ -898,9 +1435,22 @@
       "timeout": 10,
       "requires_auth": "BRAVE_API_KEY",
       "extract": {
-        "name": ["web", "results", 0, "title"],
-        "description": ["web", "results", 0, "description"],
-        "attributes": ["web", "results"]
+        "name": [
+          "web",
+          "results",
+          0,
+          "title"
+        ],
+        "description": [
+          "web",
+          "results",
+          0,
+          "description"
+        ],
+        "attributes": [
+          "web",
+          "results"
+        ]
       }
     },
     {
@@ -911,76 +1461,171 @@
       "method": "GET",
       "timeout": 10,
       "extract": {
-        "name": ["RelatedTopics", 0, "Text"],
-        "description": ["AbstractText"],
-        "attributes": ["RelatedTopics"]
+        "name": [
+          "RelatedTopics",
+          0,
+          "Text"
+        ],
+        "description": [
+          "AbstractText"
+        ],
+        "attributes": [
+          "RelatedTopics"
+        ]
       }
     },
     {
       "name": "SerpAPI",
       "type": "api",
-      "weight": 0.50,
+      "weight": 0.5,
       "url_template": "https://serpapi.com/search.json?q={upc}&api_key={SERPAPI_KEY}&engine=google",
       "method": "GET",
       "timeout": 10,
       "requires_auth": "SERPAPI_KEY",
       "extract": {
-        "name": ["organic_results", 0, "title"],
-        "brand": ["organic_results", 0, "pagemap", "metatags", 0, "og:brand"],
-        "category": ["organic_results", 0, "pagemap", "metatags", 0, "og:category"],
-        "description": ["organic_results", 0, "snippet"],
-        "image_urls": ["organic_results", 0, "pagemap", "cse_image", 0, "src"],
-        "attributes": ["organic_results", 0, "pagemap"]
+        "name": [
+          "organic_results",
+          0,
+          "title"
+        ],
+        "brand": [
+          "organic_results",
+          0,
+          "pagemap",
+          "metatags",
+          0,
+          "og:brand"
+        ],
+        "category": [
+          "organic_results",
+          0,
+          "pagemap",
+          "metatags",
+          0,
+          "og:category"
+        ],
+        "description": [
+          "organic_results",
+          0,
+          "snippet"
+        ],
+        "image_urls": [
+          "organic_results",
+          0,
+          "pagemap",
+          "cse_image",
+          0,
+          "src"
+        ],
+        "attributes": [
+          "organic_results",
+          0,
+          "pagemap"
+        ]
       }
     },
     {
       "name": "RapidAPI UPC",
       "type": "api",
-      "weight": 0.50,
+      "weight": 0.5,
       "url_template": "https://upc-lookup.p.rapidapi.com/{upc}",
       "method": "GET",
       "timeout": 10,
       "requires_auth": "RAPIDAPI_KEY",
       "extract": {
-        "name": ["product", "name"],
-        "brand": ["product", "brand"],
-        "category": ["product", "category"],
-        "description": ["product", "description"],
-        "image_urls": ["product", "images"],
-        "attributes": ["product", "attributes"]
+        "name": [
+          "product",
+          "name"
+        ],
+        "brand": [
+          "product",
+          "brand"
+        ],
+        "category": [
+          "product",
+          "category"
+        ],
+        "description": [
+          "product",
+          "description"
+        ],
+        "image_urls": [
+          "product",
+          "images"
+        ],
+        "attributes": [
+          "product",
+          "attributes"
+        ]
       }
     },
     {
       "name": "RapidAPI Barcode",
       "type": "api",
-      "weight": 0.50,
+      "weight": 0.5,
       "url_template": "https://barcode-lookup.p.rapidapi.com/{upc}",
       "method": "GET",
       "timeout": 10,
       "requires_auth": "RAPIDAPI_KEY",
       "extract": {
-        "name": ["product", "name"],
-        "brand": ["product", "brand"],
-        "category": ["product", "category"],
-        "description": ["product", "description"],
-        "image_urls": ["product", "images"],
-        "attributes": ["product", "attributes"]
+        "name": [
+          "product",
+          "name"
+        ],
+        "brand": [
+          "product",
+          "brand"
+        ],
+        "category": [
+          "product",
+          "category"
+        ],
+        "description": [
+          "product",
+          "description"
+        ],
+        "image_urls": [
+          "product",
+          "images"
+        ],
+        "attributes": [
+          "product",
+          "attributes"
+        ]
       }
     },
     {
       "name": "Rakuten",
       "type": "api",
-      "weight": 0.40,
+      "weight": 0.4,
       "url_template": "https://api.rakuten.com/products/{upc}",
       "method": "GET",
       "timeout": 10,
       "extract": {
-        "name": ["product", "name"],
-        "brand": ["product", "brand"],
-        "category": ["product", "category"],
-        "description": ["product", "description"],
-        "image_urls": ["product", "images"],
-        "attributes": ["product", "attributes"]
+        "name": [
+          "product",
+          "name"
+        ],
+        "brand": [
+          "product",
+          "brand"
+        ],
+        "category": [
+          "product",
+          "category"
+        ],
+        "description": [
+          "product",
+          "description"
+        ],
+        "image_urls": [
+          "product",
+          "images"
+        ],
+        "attributes": [
+          "product",
+          "attributes"
+        ]
       }
     },
     {
@@ -991,8 +1636,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".item-title"],
-        "brand": [".item-brand"]
+        "name": [
+          ".item-title"
+        ],
+        "brand": [
+          ".item-brand"
+        ]
       }
     },
     {
@@ -1003,8 +1652,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -1015,8 +1668,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".ProductCard-title"],
-        "brand": [".ProductCard-brand"]
+        "name": [
+          ".ProductCard-title"
+        ],
+        "brand": [
+          ".ProductCard-brand"
+        ]
       }
     },
     {
@@ -1027,8 +1684,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -1039,8 +1700,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": ["h1"],
-        "brand": [".brand"]
+        "name": [
+          "h1"
+        ],
+        "brand": [
+          ".brand"
+        ]
       }
     },
     {
@@ -1051,8 +1716,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -1063,8 +1732,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -1075,8 +1748,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -1087,8 +1764,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -1099,8 +1780,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -1111,8 +1796,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -1123,8 +1812,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -1135,8 +1828,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -1147,8 +1844,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -1159,8 +1860,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -1171,8 +1876,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -1183,8 +1892,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -1195,8 +1908,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -1207,8 +1924,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -1219,8 +1940,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -1231,8 +1956,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".item-info"],
-        "brand": [".author"]
+        "name": [
+          ".item-info"
+        ],
+        "brand": [
+          ".author"
+        ]
       }
     },
     {
@@ -1243,8 +1972,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".book-title"],
-        "brand": [".author"]
+        "name": [
+          ".book-title"
+        ],
+        "brand": [
+          ".author"
+        ]
       }
     },
     {
@@ -1255,8 +1988,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".book-title"],
-        "brand": [".author"]
+        "name": [
+          ".book-title"
+        ],
+        "brand": [
+          ".author"
+        ]
       }
     },
     {
@@ -1267,8 +2004,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".AllEditionsItem-title"],
-        "brand": [".author"]
+        "name": [
+          ".AllEditionsItem-title"
+        ],
+        "brand": [
+          ".author"
+        ]
       }
     },
     {
@@ -1279,8 +2020,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".book-title"],
-        "brand": [".author"]
+        "name": [
+          ".book-title"
+        ],
+        "brand": [
+          ".author"
+        ]
       }
     },
     {
@@ -1291,8 +2036,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".book-title"],
-        "brand": [".author"]
+        "name": [
+          ".book-title"
+        ],
+        "brand": [
+          ".author"
+        ]
       }
     },
     {
@@ -1303,8 +2052,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".pdp-header-title"],
-        "brand": [".pdp-header-author"]
+        "name": [
+          ".pdp-header-title"
+        ],
+        "brand": [
+          ".pdp-header-author"
+        ]
       }
     },
     {
@@ -1315,8 +2068,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -1327,8 +2084,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -1339,8 +2100,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -1351,8 +2116,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -1363,8 +2132,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".search-result-title"],
-        "brand": [".search-result-brand"]
+        "name": [
+          ".search-result-title"
+        ],
+        "brand": [
+          ".search-result-brand"
+        ]
       }
     },
     {
@@ -1375,8 +2148,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -1387,8 +2164,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -1399,8 +2180,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -1411,8 +2196,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".prd-title"],
-        "brand": [".prd-brand"]
+        "name": [
+          ".prd-title"
+        ],
+        "brand": [
+          ".prd-brand"
+        ]
       }
     },
     {
@@ -1423,8 +2212,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -1435,8 +2228,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -1447,8 +2244,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -1459,8 +2260,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -1471,8 +2276,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -1483,8 +2292,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -1495,8 +2308,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -1507,8 +2324,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -1519,8 +2340,12 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".product-title"],
-        "brand": [".product-brand"]
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
@@ -1531,116 +2356,2412 @@
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": [".v2-listing-card__title"],
-        "brand": [".v2-listing-card__shop"]
+        "name": [
+          ".v2-listing-card__title"
+        ],
+        "brand": [
+          ".v2-listing-card__shop"
+        ]
       }
     },
     {
       "name": "Shopify Stores",
       "type": "search",
-      "weight": 0.30,
+      "weight": 0.3,
       "url_template": "https://www.google.com/search?q=shopify+{upc}",
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": ["h3"],
-        "brand": [".product-brand"]
+        "name": [
+          "h3"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
       "name": "BigCommerce Stores",
       "type": "search",
-      "weight": 0.30,
+      "weight": 0.3,
       "url_template": "https://www.google.com/search?q=bigcommerce+{upc}",
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": ["h3"],
-        "brand": [".product-brand"]
+        "name": [
+          "h3"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
       "name": "WooCommerce Stores",
       "type": "search",
-      "weight": 0.30,
+      "weight": 0.3,
       "url_template": "https://www.google.com/search?q=woocommerce+{upc}",
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": ["h3"],
-        "brand": [".product-brand"]
+        "name": [
+          "h3"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
       "name": "Magento Stores",
       "type": "search",
-      "weight": 0.30,
+      "weight": 0.3,
       "url_template": "https://www.google.com/search?q=magento+{upc}",
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": ["h3"],
-        "brand": [".product-brand"]
+        "name": [
+          "h3"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
       "name": "PrestaShop Stores",
       "type": "search",
-      "weight": 0.30,
+      "weight": 0.3,
       "url_template": "https://www.google.com/search?q=prestashop+{upc}",
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": ["h3"],
-        "brand": [".product-brand"]
+        "name": [
+          "h3"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
       "name": "OpenCart Stores",
       "type": "search",
-      "weight": 0.30,
+      "weight": 0.3,
       "url_template": "https://www.google.com/search?q=opencart+{upc}",
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": ["h3"],
-        "brand": [".product-brand"]
+        "name": [
+          "h3"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
       "name": "Squarespace Stores",
       "type": "search",
-      "weight": 0.30,
+      "weight": 0.3,
       "url_template": "https://www.google.com/search?q=squarespace+{upc}",
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": ["h3"],
-        "brand": [".product-brand"]
+        "name": [
+          "h3"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
       "name": "Wix Stores",
       "type": "search",
-      "weight": 0.30,
+      "weight": 0.3,
       "url_template": "https://www.google.com/search?q=wix+{upc}",
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": ["h3"],
-        "brand": [".product-brand"]
+        "name": [
+          "h3"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     },
     {
       "name": "Weebly Stores",
       "type": "search",
-      "weight": 0.30,
+      "weight": 0.3,
       "url_template": "https://www.google.com/search?q=weebly+{upc}",
       "method": "GET",
       "timeout": 10,
       "selectors": {
-        "name": ["h3"],
-        "brand": [".product-brand"]
+        "name": [
+          "h3"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Food Lion",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.foodlion.com/search?searchTerm={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Hannaford",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.hannaford.com/search?searchTerm={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "King Soopers",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.kingsoopers.com/search?query={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "QFC",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.qfc.com/search?query={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Fred Meyer",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.fredmeyer.com/search?query={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Smith's",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.smithsfoodanddrug.com/search?query={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Ralphs",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.ralphs.com/search?query={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Vons",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.vons.com/shop/search-results.html?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Stop & Shop",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.stopandshop.com/search?searchTerm={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Giant Food",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://giantfood.com/search?searchTerm={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "ShopRite",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.shoprite.com/sm/pickup/rsid/3000/results?search={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Acme Markets",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.acmemarkets.com/search?searchTerm={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Weis Markets",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.weismarkets.com/search?searchTerm={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Save A Lot",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.savealot.com/search/?text={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Aldi",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.aldi.us/search/?search={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-tile__title"
+        ],
+        "brand": [
+          ".product-tile__brand"
+        ]
+      }
+    },
+    {
+      "name": "Lidl",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.lidl.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product__title"
+        ],
+        "brand": [
+          ".product__brand"
+        ]
+      }
+    },
+    {
+      "name": "Winn-Dixie",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.winndixie.com/search?searchTerm={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Harris Teeter",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.harristeeter.com/search?query={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Food City",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.foodcity.com/search/?search={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Tesco",
+      "type": "html",
+      "weight": 0.45,
+      "url_template": "https://www.tesco.com/groceries/en-GB/search?query={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-tile--title"
+        ],
+        "brand": [
+          ".product-tile--brand"
+        ]
+      }
+    },
+    {
+      "name": "Asda",
+      "type": "html",
+      "weight": 0.45,
+      "url_template": "https://groceries.asda.com/search/{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".co-product__title"
+        ],
+        "brand": [
+          ".co-product__brand"
+        ]
+      }
+    },
+    {
+      "name": "Sainsbury's",
+      "type": "html",
+      "weight": 0.45,
+      "url_template": "https://www.sainsburys.co.uk/gol-ui/SearchResults/{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-name"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Morrisons",
+      "type": "html",
+      "weight": 0.45,
+      "url_template": "https://groceries.morrisons.com/search?entry={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".fop-title"
+        ],
+        "brand": [
+          ".fop-brand"
+        ]
+      }
+    },
+    {
+      "name": "Waitrose",
+      "type": "html",
+      "weight": 0.45,
+      "url_template": "https://www.waitrose.com/ecom/shop/search?&searchTerm={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product__name"
+        ],
+        "brand": [
+          ".product__brand"
+        ]
+      }
+    },
+    {
+      "name": "Ocado",
+      "type": "html",
+      "weight": 0.45,
+      "url_template": "https://www.ocado.com/search?entry={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".fop-title"
+        ],
+        "brand": [
+          ".fop-brand"
+        ]
+      }
+    },
+    {
+      "name": "Boots UK",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.boots.com/search?searchTerm={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-name"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Superdrug",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.superdrug.com/search?text={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-name"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Carrefour",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.carrefour.fr/s?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Auchan",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.auchan.fr/recherche?text={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "E.Leclerc",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.e.leclerc/fp/recherche?searchText={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Intermarche",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.intermarche.com/recherche/{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Rewe",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.rewe.de/suche?search={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Edeka",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.edeka24.de/search?search={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "dm DE",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.dm.de/search?search={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Rossmann",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.rossmann.de/de/search?search={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Coles",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.coles.com.au/search/products?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product__title"
+        ],
+        "brand": [
+          ".product__brand"
+        ]
+      }
+    },
+    {
+      "name": "Woolworths AU",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.woolworths.com.au/shop/search/products?searchTerm={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Countdown NZ",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.countdown.co.nz/shop/searchproducts?search={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "FairPrice SG",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.fairprice.com.sg/search?query={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Cold Storage SG",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://coldstorage.com.sg/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "BigBasket",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.bigbasket.com/ps/?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".Product__UpdatedTitle"
+        ],
+        "brand": [
+          ".Brand"
+        ]
+      }
+    },
+    {
+      "name": "Blinkit",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://blinkit.com/s/?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Zepto",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.zeptonow.com/search?query={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "ASOS",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.asos.com/search/?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-description"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Zara",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.zara.com/us/en/search?searchTerm={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-name"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "H&M",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www2.hm.com/en_us/search-results.html?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".item-heading"
+        ],
+        "brand": [
+          ".item-brand"
+        ]
+      }
+    },
+    {
+      "name": "Nordstrom",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.nordstrom.com/sr?keyword={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Macy's",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.macys.com/shop/search?keyword={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".productDescription"
+        ],
+        "brand": [
+          ".productBrand"
+        ]
+      }
+    },
+    {
+      "name": "Kohl's",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.kohls.com/search.jsp?search={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".prod-title"
+        ],
+        "brand": [
+          ".prod-brand"
+        ]
+      }
+    },
+    {
+      "name": "JCPenney",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.jcpenney.com/g/search/?searchTerm={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Dillard's",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.dillards.com/search/?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Belk",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.belk.com/search/?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "TJ Maxx",
+      "type": "html",
+      "weight": 0.3,
+      "url_template": "https://www.tjmaxx.com/us/shop?search={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Marshalls",
+      "type": "html",
+      "weight": 0.3,
+      "url_template": "https://www.marshalls.com/us/shop?search={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Ross",
+      "type": "html",
+      "weight": 0.3,
+      "url_template": "https://www.rossstores.com/search?query={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Burlington",
+      "type": "html",
+      "weight": 0.3,
+      "url_template": "https://www.burlington.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Forever 21",
+      "type": "html",
+      "weight": 0.3,
+      "url_template": "https://www.forever21.com/us/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Uniqlo",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.uniqlo.com/us/en/search/?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-name"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Gap",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.gap.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Old Navy",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://oldnavy.gap.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Banana Republic",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://bananarepublic.gap.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "American Eagle",
+      "type": "html",
+      "weight": 0.3,
+      "url_template": "https://www.ae.com/us/en/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Urban Outfitters",
+      "type": "html",
+      "weight": 0.3,
+      "url_template": "https://www.urbanoutfitters.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Anthropologie",
+      "type": "html",
+      "weight": 0.3,
+      "url_template": "https://www.anthropologie.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Revolve",
+      "type": "html",
+      "weight": 0.3,
+      "url_template": "https://www.revolve.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Farfetch",
+      "type": "html",
+      "weight": 0.3,
+      "url_template": "https://www.farfetch.com/shopping/men/items.aspx?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "SSENSE",
+      "type": "html",
+      "weight": 0.3,
+      "url_template": "https://www.ssense.com/en-us/men?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Zappos",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.zappos.com/search?term={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "DSW",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.dsw.com/en/us/search?searchTerm={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Foot Locker",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.footlocker.com/search?query={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Finish Line",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.finishline.com/store/search?searchTerm={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Sephora",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.sephora.com/search?keyword={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Ulta",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.ulta.com/shop/search/?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Dermstore",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.dermstore.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "SkinStore",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.skinstore.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Bluemercury",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.bluemercury.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Space NK",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.spacenk.com/us/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Cult Beauty",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.cultbeauty.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Lookfantastic",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.lookfantastic.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Feelunique",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.feelunique.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Beauty Bay",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.beautybay.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Bed Bath & Beyond",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.bedbathandbeyond.com/search?search={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Williams Sonoma",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.williams-sonoma.com/search/results.html?words={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Crate & Barrel",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.crateandbarrel.com/search/?query={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Pottery Barn",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.potterybarn.com/search/results.html?words={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "West Elm",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.westelm.com/search/results.html?words={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "IKEA",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.ikea.com/us/en/search/?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Menards",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.menards.com/main/search.html?search={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Ace Hardware",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.acehardware.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Harbor Freight",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.harborfreight.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Grainger",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.grainger.com/search?searchQuery={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "McMaster-Carr",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.mcmaster.com/{upc}/",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Uline",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.uline.com/Search/SearchResults?txt={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Zoro",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.zoro.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Global Industrial",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.globalindustrial.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "MSC Direct",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.mscdirect.com/product?Search={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Build.com",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.build.com/search?term={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Ferguson",
+      "type": "html",
+      "weight": 0.3,
+      "url_template": "https://www.ferguson.com/search?text={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Houzz",
+      "type": "html",
+      "weight": 0.3,
+      "url_template": "https://www.houzz.com/products/query/{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Chewy",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.chewy.com/search?query={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Petco",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.petco.com/shop/en/petcostore/search?query={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "PetSmart",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.petsmart.com/search/?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Pet Supplies Plus",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.petsuppliesplus.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Petflow",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.petflow.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "1800PetMeds",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.1800petmeds.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "AutoZone",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.autozone.com/search?searchText={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "O'Reilly Auto Parts",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.oreillyauto.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Advance Auto Parts",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://shop.advanceautoparts.com/web/SearchResults?searchTerm={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "RockAuto",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.rockauto.com/en/catalog/,{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".listing-text"
+        ],
+        "brand": [
+          ".listing-brand"
+        ]
+      }
+    },
+    {
+      "name": "Summit Racing",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.summitracing.com/search/?query={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "JEGS",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.jegs.com/i/search/?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "CARiD",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.carid.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Parts Geek",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.partsgeek.com/gbproducts/{upc}/",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "1A Auto",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.1aauto.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Dick's Sporting Goods",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.dickssportinggoods.com/search/SearchDisplay?searchTerm={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Academy Sports",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.academy.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "REI",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.rei.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Decathlon",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.decathlon.com/search?query={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Bass Pro Shops",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.basspro.com/shop/en/search/?search={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Cabela's",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.cabelas.com/shop/en/search/?search={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Sportsman's Warehouse",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.sportsmans.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Big 5 Sporting Goods",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.big5sportinggoods.com/catalogsearch/result/?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Backcountry",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.backcountry.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Moosejaw",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.moosejaw.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Mountain Warehouse",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.mountainwarehouse.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Toys R Us",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.toysrus.com/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "LEGO Shop",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.lego.com/en-us/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "GameStop",
+      "type": "html",
+      "weight": 0.4,
+      "url_template": "https://www.gamestop.com/search/?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Entertainment Earth",
+      "type": "html",
+      "weight": 0.3,
+      "url_template": "https://www.entertainmentearth.com/s/?search={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "BigBadToyStore",
+      "type": "html",
+      "weight": 0.3,
+      "url_template": "https://www.bigbadtoystore.com/Search?SearchText={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Bookshop.org",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://bookshop.org/search?keywords={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".book-title"
+        ],
+        "brand": [
+          ".book-author"
+        ]
+      }
+    },
+    {
+      "name": "Books-A-Million",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://www.booksamillion.com/search?filter=&query={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Half Price Books",
+      "type": "html",
+      "weight": 0.3,
+      "url_template": "https://www.hpb.com/products?utf8=%E2%9C%93&keywords={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Mercado Libre",
+      "type": "html",
+      "weight": 0.35,
+      "url_template": "https://listado.mercadolibre.com.mx/{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".ui-search-item__title"
+        ],
+        "brand": [
+          ".ui-search-item__brand"
+        ]
+      }
+    },
+    {
+      "name": "AliExpress",
+      "type": "html",
+      "weight": 0.3,
+      "url_template": "https://www.aliexpress.com/wholesale?SearchText={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Banggood",
+      "type": "html",
+      "weight": 0.3,
+      "url_template": "https://www.banggood.com/search/{upc}.html",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Wish",
+      "type": "html",
+      "weight": 0.25,
+      "url_template": "https://www.wish.com/search/{upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          ".product-title"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Yandex Search",
+      "type": "search",
+      "weight": 0.3,
+      "url_template": "https://yandex.com/search/?text={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          "h2"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Yahoo Search",
+      "type": "search",
+      "weight": 0.3,
+      "url_template": "https://search.yahoo.com/search?p={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          "h3"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Baidu Search",
+      "type": "search",
+      "weight": 0.25,
+      "url_template": "https://www.baidu.com/s?wd={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          "h3"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
+      }
+    },
+    {
+      "name": "Ecosia",
+      "type": "search",
+      "weight": 0.25,
+      "url_template": "https://www.ecosia.org/search?q={upc}",
+      "method": "GET",
+      "timeout": 10,
+      "selectors": {
+        "name": [
+          "h2"
+        ],
+        "brand": [
+          ".product-brand"
+        ]
       }
     }
   ]

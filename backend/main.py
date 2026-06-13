@@ -57,7 +57,7 @@ _scrape_times: List[float] = []
 async def lifespan(app: FastAPI):
     global http_client, scraper, foundry_iq, agent
     init_db()
-    http_client = httpx.AsyncClient(timeout=30.0, limits=httpx.Limits(max_connections=50, max_keepalive_connections=20))
+    http_client = httpx.AsyncClient(timeout=30.0, limits=httpx.Limits(max_connections=300, max_keepalive_connections=100))
     scraper = UPCScraper(http_client)
     foundry_iq = get_foundry_iq_service(db_path="shelfwise.db")
     agent = ProductReasoningAgent(foundry_iq_service=foundry_iq)

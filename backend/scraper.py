@@ -243,8 +243,8 @@ class UPCScraper:
                 seen_names.add(name)
                 unique_scrapers.append((name, fn))
 
-        # Run all unique sources up to a safety ceiling of 200
-        max_concurrent = 200
+        # Run all unique sources up to a safety ceiling of 300
+        max_concurrent = 300
         if len(unique_scrapers) > max_concurrent:
             sorted_registry = sorted(registry_pairs, key=lambda p: p[0].get("weight", 0.3), reverse=True)
             core_names = {n for n, _ in core_scrapers}
