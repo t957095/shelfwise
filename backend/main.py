@@ -45,7 +45,7 @@ logger = logging.getLogger("shelfwise")
 DEMO_UPCS = ["049000050103", "022000020806", "012000001307"]
 http_client: Optional[httpx.AsyncClient] = None
 scraper: Optional[UPCScraper] = None
-agent = ProductReasoningAgent()
+agent: Optional[ProductReasoningAgent] = None
 foundry_iq: Optional[FoundryIQService] = None
 
 # Request timing metrics
@@ -55,11 +55,12 @@ _scrape_times: List[float] = []
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global http_client, scraper, foundry_iq
+    global http_client, scraper, foundry_iq, agent
     init_db()
     http_client = httpx.AsyncClient(timeout=30.0, limits=httpx.Limits(max_connections=50, max_keepalive_connections=20))
     scraper = UPCScraper(http_client)
     foundry_iq = get_foundry_iq_service(db_path="shelfwise.db")
+    agent = ProductReasoningAgent(foundry_iq_service=foundry_iq)
     logger.info("ShelfWise API started (optimized) | Foundry IQ: %s", "azure" if foundry_iq.is_real_integration else "local_simulation")
     logger.info(
         "Foundry reasoning clients | azure-ai-inference=%s azure-ai-projects=%s openai-compatible=%s",

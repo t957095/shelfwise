@@ -12,6 +12,7 @@ import asyncio
 import re
 import json
 import logging
+import hashlib
 from typing import List, Dict, Optional, Tuple, Any
 from pathlib import Path
 
@@ -23,6 +24,13 @@ try:
         load_dotenv(_env_path)
 except Exception:
     pass
+
+# Optional Foundry IQ knowledge graph fallback
+try:
+    from backend.foundry_iq import FoundryIQService, ProductKnowledgeGraph
+    _FOUNDRY_IQ_AVAILABLE = True
+except Exception:
+    _FOUNDRY_IQ_AVAILABLE = False
 
 # ---------------------------------------------------------------------------
 # Microsoft Azure AI Foundry SDK imports (graceful degradation if missing)
@@ -87,10 +95,11 @@ def _jaccard_similarity(a: str, b: str) -> float:
 class ProductReasoningAgent:
     """AI reasoning agent that consolidates raw product data from multiple sources."""
 
-    def __init__(self):
+    def __init__(self, foundry_iq_service: Optional[Any] = None):
         self._azure_client: Optional[Any] = None
         self._openai_client: Optional[Any] = None
         self._azure_projects_client: Optional[Any] = None
+        self._foundry_iq_service: Optional[Any] = foundry_iq_service
         self._init_clients()
 
     def _init_clients(self):
@@ -286,8 +295,81 @@ class ProductReasoningAgent:
             except Exception:
                 pass
 
-        # --- Tier 4: Local simulation (no network) ---
+        # --- Tier 4: Foundry IQ knowledge graph fallback ---
+        if self._foundry_iq_service and _FOUNDRY_IQ_AVAILABLE:
+            try:
+                result = await self._foundry_iq_fallback(upc, current_name, current_brand, current_category)
+                if result:
+                    return {"data": result, "sdk": "foundry-iq-local"}
+            except Exception:
+                pass
+
+        # --- Tier 5: Local simulation (no network) ---
         return None
+
+    async def _foundry_iq_fallback(
+        self, upc: str, current_name: str, current_brand: Optional[str],
+        current_category: Optional[str]
+    ) -> Optional[Dict[str, Any]]:
+        """Use the local Foundry IQ knowledge graph to enrich product data.
+
+        Looks up the product by UPC, then extracts brand, category, and attributes
+        from related graph nodes. Returns a dict in the same shape as the LLM tier.
+        """
+        if not self._foundry_iq_service:
+            return None
+
+        kg = self._foundry_iq_service.knowledge_graph
+        product_id = f"product:{hashlib.md5(upc.lower().encode()).hexdigest()[:12]}"
+        product_node = kg.get_node(product_id)
+
+        # If not in runtime graph, try re-ingesting the catalog from SQLite
+        if not product_node:
+            try:
+                self._foundry_iq_service.ingest_product_catalog()
+                product_node = kg.get_node(product_id)
+            except Exception:
+                pass
+
+        if not product_node:
+            return None
+
+        related = kg.get_related(product_id)
+
+        graph_name = product_node.label
+        name = current_name
+        if not name or name.lower() in {"unknown product", "unknown", ""}:
+            name = graph_name
+        brand = current_brand
+        category = current_category
+        attributes: Dict[str, Any] = {}
+        description = product_node.properties.get("description", "")
+
+        for rel in related:
+            relation = rel["edge"]["relation"]
+            node = rel["node"]
+            if relation == "manufactured_by" and not brand:
+                brand = node.get("label")
+            elif relation == "belongs_to" and not category:
+                category = node.get("label")
+            elif relation.startswith("has_"):
+                props = node.get("properties", {})
+                key = props.get("key")
+                value = props.get("value")
+                if key and value is not None:
+                    attributes[key] = value
+
+        # Only return meaningful enrichment
+        if not (brand or category or attributes or description):
+            return None
+
+        return {
+            "name": name,
+            "brand": brand,
+            "category": category,
+            "description": description or f"{name} by {brand}" if brand else name,
+            "attributes": attributes,
+        }
 
     def _build_llm_prompt(
         self, upc: str, raw_data_list: List[Dict[str, Any]],

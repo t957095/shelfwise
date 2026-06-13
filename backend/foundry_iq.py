@@ -317,16 +317,22 @@ class FoundryIQService:
             conn = sqlite3.connect(self.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM products")
+            cursor.execute("SELECT upc, name, brand, category, confidence, status, foundry_enriched, foundry_sdk, data FROM products")
             rows = cursor.fetchall()
             for row in rows:
-                product = dict(row)
-                # Parse JSON fields
-                for field in ["images", "attributes", "citations"]:
-                    try:
-                        product[field] = json.loads(product.get(field, "[]") or "[]")
-                    except (json.JSONDecodeError, TypeError):
-                        product[field] = []
+                row_dict = dict(row)
+                # Product details live in the JSON `data` column
+                try:
+                    product = json.loads(row_dict.get("data", "{}"))
+                except (json.JSONDecodeError, TypeError):
+                    product = {}
+                # Ensure core scalar fields from the row are present
+                product.setdefault("upc", row_dict.get("upc"))
+                product.setdefault("name", row_dict.get("name"))
+                product.setdefault("brand", row_dict.get("brand"))
+                product.setdefault("category", row_dict.get("category"))
+                product.setdefault("confidence", row_dict.get("confidence"))
+                product.setdefault("status", row_dict.get("status"))
                 self.knowledge_graph.build_from_product(product)
             conn.close()
         except Exception as e:
