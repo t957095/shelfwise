@@ -43,6 +43,9 @@ env/
 *.sqlite
 *.sqlite3
 shelfwise.db
+*.db-wal
+*.db-shm
+*.db-journal
 
 # Logs
 *.log

@@ -8,6 +8,7 @@ Microsoft Azure AI Foundry SDK integration with tiered fallback:
 """
 
 import os
+import asyncio
 import re
 import json
 from typing import List, Dict, Optional, Tuple, Any
@@ -92,7 +93,7 @@ class ProductReasoningAgent:
         if _AZURE_INFERENCE_AVAILABLE and endpoint and api_key and ("azure.com" in endpoint or "inference.ai" in endpoint):
             try:
                 self._azure_client = ChatCompletionsClient(
-                    endpoint=endpoint,
+                    endpoint=endpoint.rstrip("/") + "/openai/deployments/" + os.environ.get("FOUNDRY_MODEL", "gpt-4o"),
                     credential=AzureKeyCredential(api_key),
                 )
             except Exception:
