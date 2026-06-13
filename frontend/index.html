@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="ShelfWise - AI Product Portfolio Builder for Small Businesses. Transform UPC codes into complete e-commerce listings.">
+    <meta name="theme-color" content="#0f0f23">
+    <title>ShelfWise - AI Product Portfolio Builder</title>
+    <link rel="preload" href="styles.css" as="style">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="/api">
+</head>
+<body>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header" role="banner">
+            <h1>ShelfWise</h1>
+            <p class="subtitle">AI Product Portfolio Builder for Small Businesses</p>
+            <span class="badge">Microsoft Foundry Powered</span>
+        </header>
+
+        <main id="main-content">
+            <!-- Input Section -->
+            <section class="input-section" aria-labelledby="input-heading">
+                <h2 id="input-heading" class="sr-only" style="position: absolute; left: -10000px;">Product Input</h2>
+
+                <div class="input-group">
+                    <label for="upc-textarea">Enter UPC Codes (one per line)</label>
+                    <textarea
+                        id="upc-textarea"
+                        placeholder="049000050103&#10;022000020806&#10;012000001307"
+                        rows="4"
+                        aria-describedby="upc-help"
+                    ></textarea>
+                    <span id="upc-help" style="display: block; color: var(--text-muted); font-size: 0.8rem; margin-top: 4px;">Enter one UPC code per line, or upload a CSV file below</span>
+                </div>
+
+                <div class="input-group">
+                    <label for="csv-file">Or Upload CSV (must have 'upc' column)</label>
+                    <input
+                        type="file"
+                        id="csv-file"
+                        accept=".csv"
+                        aria-describedby="csv-help"
+                    >
+                    <span id="csv-help" style="display: block; color: var(--text-muted); font-size: 0.8rem; margin-top: 4px;">Drag and drop supported. CSV must contain a column named 'upc'.</span>
+                </div>
+
+                <div class="button-group">
+                    <button id="submit-btn" class="btn btn-primary" aria-label="Submit UPC codes for processing">
+                        <span>⚡</span> Submit UPCs
+                    </button>
+                    <button id="demo-btn" class="btn btn-secondary" aria-label="Load demo products">
+                        <span>🎯</span> Load Demo
+                    </button>
+                </div>
+            </section>
+
+            <!-- Job Status -->
+            <section class="status-section" id="status-section" style="display: none;" aria-live="polite" aria-atomic="false">
+                <h3>Processing Status</h3>
+                <div class="status-grid">
+                    <div class="status-item">
+                        <span class="status-label">Total</span>
+                        <span class="status-value" id="status-total">0</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Queued</span>
+                        <span class="status-value" id="status-queued">0</span>
+                    </div>
+                    <div class="status-item" id="status-running-item">
+                        <span class="status-label">Running</span>
+                        <span class="status-value" id="status-running">0</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Completed</span>
+                        <span class="status-value" id="status-completed">0</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Failed</span>
+                        <span class="status-value" id="status-failed">0</span>
+                    </div>
+                </div>
+                <div class="progress-container">
+                    <div class="progress-bar-bg" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Processing progress">
+                        <div class="progress-bar-fill" id="progress-fill" style="width: 0%;"></div>
+                    </div>
+                    <div class="progress-text" id="progress-text">0 of 0 complete (0%)</div>
+                </div>
+            </section>
+
+            <!-- Products Grid -->
+            <section class="products-section" aria-labelledby="products-heading">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+                    <h2 id="products-heading" style="margin-bottom: 0;">Products <span id="product-count">(0)</span></h2>
+                    <div style="display: flex; gap: 8px;">
+                        <select id="sort-select" aria-label="Sort products" style="padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.85rem; cursor: pointer;">
+                            <option value="confidence-desc">⬇️ Confidence (High-Low)</option>
+                            <option value="confidence-asc">⬆️ Confidence (Low-High)</option>
+                            <option value="name-asc">⬇️ Name (A-Z)</option>
+                            <option value="name-desc">⬆️ Name (Z-A)</option>
+                        </select>
+                        <button id="clear-btn" class="btn btn-outline btn-sm" aria-label="Clear all products">
+                            🗑️ Clear
+                        </button>
+                    </div>
+                </div>
+                <div class="input-group" style="margin-bottom: 16px;">
+                    <input
+                        type="text"
+                        id="search-input"
+                        placeholder="Search by name, brand, or category... (Press / to focus)"
+                        style="width: 100%; padding: 10px 14px; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.9rem;"
+                        aria-label="Search products"
+                    >
+                </div>
+                <div class="products-grid" id="products-grid" role="list">
+                    <div class="empty-state" style="grid-column: 1 / -1;">
+                        <div class="icon">📦</div>
+                        <h3>No products yet</h3>
+                        <p>Enter UPC codes above or load the demo to get started</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="export-section" aria-labelledby="export-heading">
+                <h3 id="export-heading">Portfolio Analytics</h3>
+                <div class="status-grid" id="stats-grid" style="margin-bottom: 16px;">
+                    <div class="status-item">
+                        <span class="status-label">Products</span>
+                        <span class="status-value" id="stat-total">0</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Avg Confidence</span>
+                        <span class="status-value" id="stat-avg-confidence">0%</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">High Quality</span>
+                        <span class="status-value" id="stat-high">0</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Medium</span>
+                        <span class="status-value" id="stat-medium">0</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Low</span>
+                        <span class="status-value" id="stat-low">0</span>
+                    </div>
+                </div>
+                <div id="category-tags" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;"></div>
+                <div id="source-tags" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
+            </section>
+
+            <!-- Export Section -->
+            <section class="export-section" aria-labelledby="export-heading">
+                <h3 id="export-heading">Export Portfolio</h3>
+                <div class="export-grid">
+                    <button class="export-btn" id="export-csv-btn" aria-label="Export as CSV">
+                        <span class="icon">📊</span>
+                        <span class="label">CSV</span>
+                        <span class="hint">Generic spreadsheet</span>
+                    </button>
+                    <button class="export-btn" id="export-json-btn" aria-label="Export as JSON">
+                        <span class="icon">💻</span>
+                        <span class="label">JSON</span>
+                        <span class="hint">Developer format</span>
+                    </button>
+                    <button class="export-btn" id="export-shopify-btn" aria-label="Export as Shopify CSV">
+                        <span class="icon">🛒</span>
+                        <span class="label">Shopify</span>
+                        <span class="hint">Import products</span>
+                    </button>
+                    <button class="export-btn" id="export-amazon-btn" aria-label="Export as Amazon flat file">
+                        <span class="icon">📦</span>
+                        <span class="label">Amazon</span>
+                        <span class="hint">Seller Central</span>
+                    </button>
+                    <button class="export-btn" id="export-woocommerce-btn" aria-label="Export as WooCommerce CSV">
+                        <span class="icon">🏪</span>
+                        <span class="label">WooCommerce</span>
+                        <span class="hint">WordPress store</span>
+                    </button>
+                    <button class="export-btn" id="export-ebay-btn" aria-label="Export as eBay file">
+                        <span class="icon">🔨</span>
+                        <span class="label">eBay</span>
+                        <span class="hint">Turbo Lister</span>
+                    </button>
+                    <button class="export-btn" id="export-etsy-btn" aria-label="Export as Etsy CSV">
+                        <span class="icon">🧵</span>
+                        <span class="label">Etsy</span>
+                        <span class="hint">Handmade shop</span>
+                    </button>
+                    <button class="export-btn" id="export-bigcommerce-btn" aria-label="Export as BigCommerce CSV">
+                        <span class="icon">🌐</span>
+                        <span class="label">BigCommerce</span>
+                        <span class="hint">Enterprise store</span>
+                    </button>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal-overlay" id="modal-overlay" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="modal-title">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="modal-title">Reasoning Trace</h3>
+                <button class="modal-close" id="modal-close" aria-label="Close modal">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body"></div>
+        </div>
+    </div>
+
+    <!-- Lightbox -->
+    <div class="modal-overlay" id="lightbox-overlay" role="dialog" aria-modal="true" aria-hidden="true" aria-label="Image lightbox">
+        <div class="lightbox">
+            <button class="modal-close" id="lightbox-close" aria-label="Close lightbox">&times;</button>
+            <img id="lightbox-image" src="" alt="" style="max-width: 90vw; max-height: 85vh; object-fit: contain; border-radius: 8px;">
+            <div id="lightbox-caption" style="color: var(--text-secondary); text-align: center; margin-top: 12px; font-size: 0.9rem;"></div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(() => {});
+        }
+    </script>
+    <script src="app.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+version: "3.8"
+
+services:
+  shelfwise:
+    build: .
+    container_name: shelfwise
+    ports:
+      - "8000:8000"
+    environment:
+      - FOUNDRY_ENDPOINT=${FOUNDRY_ENDPOINT:-}
+      - FOUNDRY_API_KEY=${FOUNDRY_API_KEY:-}
+      - FOUNDRY_MODEL=${FOUNDRY_MODEL:-gpt-4.1-mini}
+      - BRAVE_API_KEY=${BRAVE_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - GOOGLE_CX=${GOOGLE_CX:-}
+    volumes:
+      - ./backend/shelfwise.db:/app/backend/shelfwise.db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShelfWise Architecture Diagram</title>
+    <style>
+        body {
+            background: #0f0f23;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        svg {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+    <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+        <!-- Background -->
+        <rect width="1200" height="800" fill="#0f0f23" rx="12"/>
+
+        <!-- Title -->
+        <text x="600" y="40" text-anchor="middle" fill="#00d4aa" font-size="24" font-weight="800" font-family="-apple-system, sans-serif">ShelfWise Architecture</text>
+        <text x="600" y="64" text-anchor="middle" fill="#a0a0b0" font-size="13" font-family="-apple-system, sans-serif">AI Product Portfolio Builder - Microsoft Agents League 2026</text>
+
+        <!-- Input Layer -->
+        <rect x="40" y="100" width="200" height="80" rx="10" fill="#1a1a2e" stroke="#00d4aa" stroke-width="2"/>
+        <text x="140" y="130" text-anchor="middle" fill="#e8e8e8" font-size="14" font-weight="700">Input Layer</text>
+        <text x="140" y="150" text-anchor="middle" fill="#a0a0b0" font-size="11">CSV Upload / UPC Text</text>
+        <text x="140" y="166" text-anchor="middle" fill="#6c6c80" font-size="10">Drag & Drop Support</text>
+
+        <!-- Arrow: Input -> Scraper -->
+        <path d="M 240 140 L 300 140" stroke="#00d4aa" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+        <!-- Scraping Layer -->
+        <rect x="300" y="80" width="240" height="520" rx="10" fill="#1a1a2e" stroke="#1e90ff" stroke-width="2"/>
+        <text x="420" y="106" text-anchor="middle" fill="#1e90ff" font-size="14" font-weight="700">Multi-Source Scraper</text>
+        <text x="420" y="122" text-anchor="middle" fill="#a0a0b0" font-size="10">8 Concurrent Sources</text>
+
+        <!-- Source boxes -->
+        <rect x="320" y="140" width="200" height="32" rx="6" fill="#0f3460" stroke="rgba(255,255,255,0.08)"/>
+        <text x="420" y="160" text-anchor="middle" fill="#e8e8e8" font-size="11">Open Food Facts (0.90)</text>
+
+        <rect x="320" y="182" width="200" height="32" rx="6" fill="#0f3460" stroke="rgba(255,255,255,0.08)"/>
+        <text x="420" y="202" text-anchor="middle" fill="#e8e8e8" font-size="11">UPCItemDB (0.85)</text>
+
+        <rect x="320" y="224" width="200" height="32" rx="6" fill="#0f3460" stroke="rgba(255,255,255,0.08)"/>
+        <text x="420" y="244" text-anchor="middle" fill="#e8e8e8" font-size="11">BarcodeLookup (0.75)</text>
+
+        <rect x="320" y="266" width="200" height="32" rx="6" fill="#0f3460" stroke="rgba(255,255,255,0.08)"/>
+        <text x="420" y="286" text-anchor="middle" fill="#e8e8e8" font-size="11">Go-UPC (0.70)</text>
+
+        <rect x="320" y="308" width="200" height="32" rx="6" fill="#0f3460" stroke="rgba(255,255,255,0.08)"/>
+        <text x="420" y="328" text-anchor="middle" fill="#e8e8e8" font-size="11">Buycott (0.65)</text>
+
+        <rect x="320" y="350" width="200" height="32" rx="6" fill="#0f3460" stroke="rgba(255,255,255,0.08)"/>
+        <text x="420" y="370" text-anchor="middle" fill="#e8e8e8" font-size="11">EANdata (0.60)</text>
+
+        <rect x="320" y="392" width="200" height="32" rx="6" fill="#0f3460" stroke="rgba(255,255,255,0.08)"/>
+        <text x="420" y="412" text-anchor="middle" fill="#e8e8e8" font-size="11">Brave Search (0.45)</text>
+
+        <rect x="320" y="434" width="200" height="32" rx="6" fill="#0f3460" stroke="rgba(255,255,255,0.08)"/>
+        <text x="420" y="454" text-anchor="middle" fill="#e8e8e8" font-size="11">Google Search (0.40)</text>
+
+        <rect x="320" y="490" width="200" height="48" rx="6" fill="#0f3460" stroke="#ffa502" stroke-width="1" stroke-dasharray="4"/>
+        <text x="420" y="510" text-anchor="middle" fill="#ffa502" font-size="10">Rotating User-Agents</text>
+        <text x="420" y="526" text-anchor="middle" fill="#a0a0b0" font-size="9">Rate Limiting & Retry Logic</text>
+
+        <!-- Arrow: Scraper -> Reasoning -->
+        <path d="M 540 340 L 600 340" stroke="#1e90ff" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+        <!-- Reasoning Layer -->
+        <rect x="600" y="200" width="260" height="280" rx="10" fill="#1a1a2e" stroke="#00d4aa" stroke-width="2"/>
+        <text x="730" y="226" text-anchor="middle" fill="#00d4aa" font-size="14" font-weight="700">Product Reasoning Agent</text>
+        <text x="730" y="242" text-anchor="middle" fill="#a0a0b0" font-size="10">Multi-Step Consolidation</text>
+
+        <!-- Reasoning steps -->
+        <rect x="620" y="260" width="220" height="28" rx="6" fill="#0f3460"/>
+        <text x="730" y="278" text-anchor="middle" fill="#e8e8e8" font-size="10">1. Source Weighting & Filtering</text>
+
+        <rect x="620" y="296" width="220" height="28" rx="6" fill="#0f3460"/>
+        <text x="730" y="314" text-anchor="middle" fill="#e8e8e8" font-size="10">2. Jaccard Name Deduplication</text>
+
+        <rect x="620" y="332" width="220" height="28" rx="6" fill="#0f3460"/>
+        <text x="730" y="350" text-anchor="middle" fill="#e8e8e8" font-size="10">3. Field Resolution (name, brand, cat)</text>
+
+        <rect x="620" y="368" width="220" height="28" rx="6" fill="#0f3460"/>
+        <text x="730" y="386" text-anchor="middle" fill="#e8e8e8" font-size="10">4. Attribute Merge & Description</text>
+
+        <rect x="620" y="404" width="220" height="28" rx="6" fill="#0f3460"/>
+        <text x="730" y="422" text-anchor="middle" fill="#e8e8e8" font-size="10">5. Confidence Scoring [0,1]</text>
+
+        <rect x="620" y="440" width="220" height="28" rx="6" fill="#0f3460"/>
+        <text x="730" y="458" text-anchor="middle" fill="#e8e8e8" font-size="10">6. Foundry IQ Citation Generation</text>
+
+        <!-- Foundry IQ Box -->
+        <rect x="620" y="520" width="220" height="60" rx="8" fill="#0f3460" stroke="#00d4aa" stroke-width="1" stroke-dasharray="4"/>
+        <text x="730" y="542" text-anchor="middle" fill="#00d4aa" font-size="11" font-weight="700">Microsoft Foundry IQ</text>
+        <text x="730" y="558" text-anchor="middle" fill="#a0a0b0" font-size="9">Optional LLM Enrichment via</text>
+        <text x="730" y="572" text-anchor="middle" fill="#a0a0b0" font-size="9">Azure OpenAI GPT-4.1-mini</text>
+
+        <!-- Arrow: Reasoning -> Storage -->
+        <path d="M 730 480 L 730 540" stroke="#00d4aa" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+        <!-- Arrow: Reasoning -> Output -->
+        <path d="M 860 340 L 920 340" stroke="#00d4aa" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+        <!-- Storage Layer -->
+        <rect x="660" y="640" width="140" height="60" rx="10" fill="#1a1a2e" stroke="#6c6c80" stroke-width="2"/>
+        <text x="730" y="665" text-anchor="middle" fill="#e8e8e8" font-size="12" font-weight="700">SQLite</text>
+        <text x="730" y="682" text-anchor="middle" fill="#a0a0b0" font-size="10">Job Tracking + Products</text>
+
+        <!-- Arrow: Reasoning -> Storage -->
+        <path d="M 730 600 L 730 640" stroke="#6c6c80" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+        <!-- Output Layer -->
+        <rect x="920" y="100" width="240" height="520" rx="10" fill="#1a1a2e" stroke="#2ed573" stroke-width="2"/>
+        <text x="1040" y="126" text-anchor="middle" fill="#2ed573" font-size="14" font-weight="700">Output Layer</text>
+        <text x="1040" y="142" text-anchor="middle" fill="#a0a0b0" font-size="10">Portfolio & Export</text>
+
+        <rect x="940" y="160" width="200" height="40" rx="6" fill="#0f3460"/>
+        <text x="1040" y="185" text-anchor="middle" fill="#e8e8e8" font-size="11">Product Cards with Images</text>
+
+        <rect x="940" y="212" width="200" height="40" rx="6" fill="#0f3460"/>
+        <text x="1040" y="237" text-anchor="middle" fill="#e8e8e8" font-size="11">Confidence Badges & Citations</text>
+
+        <rect x="940" y="264" width="200" height="40" rx="6" fill="#0f3460"/>
+        <text x="1040" y="289" text-anchor="middle" fill="#e8e8e8" font-size="11">Reasoning Trace Viewer</text>
+
+        <rect x="940" y="316" width="200" height="40" rx="6" fill="#0f3460"/>
+        <text x="1040" y="341" text-anchor="middle" fill="#e8e8e8" font-size="11">SSE Live Progress Stream</text>
+
+        <rect x="940" y="368" width="200" height="40" rx="6" fill="#0f3460"/>
+        <text x="1040" y="393" text-anchor="middle" fill="#e8e8e8" font-size="11">CSV Export</text>
+
+        <rect x="940" y="420" width="200" height="40" rx="6" fill="#0f3460"/>
+        <text x="1040" y="445" text-anchor="middle" fill="#e8e8e8" font-size="11">JSON Export</text>
+
+        <rect x="940" y="472" width="200" height="40" rx="6" fill="#0f3460"/>
+        <text x="1040" y="497" text-anchor="middle" fill="#e8e8e8" font-size="11">Shopify Import Format</text>
+
+        <rect x="940" y="524" width="200" height="40" rx="6" fill="#0f3460"/>
+        <text x="1040" y="549" text-anchor="middle" fill="#e8e8e8" font-size="11">Amazon Flat File Format</text>
+
+        <!-- Frontend Layer -->
+        <rect x="920" y="640" width="240" height="60" rx="10" fill="#1a1a2e" stroke="#ffa502" stroke-width="2"/>
+        <text x="1040" y="665" text-anchor="middle" fill="#e8e8e8" font-size="12" font-weight="700">Vanilla JS Frontend</text>
+        <text x="1040" y="682" text-anchor="middle" fill="#a0a0b0" font-size="10">Dark Mode / A11y / Mobile</text>
+
+        <!-- Arrow: Output -> Frontend -->
+        <path d="M 1040 620 L 1040 640" stroke="#ffa502" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+        <!-- Arrow: Storage -> Frontend -->
+        <path d="M 800 670 L 920 670" stroke="#6c6c80" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+        <!-- Arrow: Input -> Frontend (direct for demo) -->
+        <path d="M 140 180 L 140 670 L 920 670" stroke="rgba(255,255,255,0.05)" stroke-width="1" stroke-dasharray="4"/>
+
+        <!-- Legend -->
+        <rect x="40" y="640" width="280" height="130" rx="8" fill="#1a1a2e" stroke="rgba(255,255,255,0.08)"/>
+        <text x="55" y="662" fill="#e8e8e8" font-size="11" font-weight="700">Legend</text>
+
+        <rect x="55" y="672" width="12" height="12" rx="3" fill="#00d4aa"/>
+        <text x="75" y="682" fill="#a0a0b0" font-size="10">Core Flow</text>
+
+        <rect x="55" y="692" width="12" height="12" rx="3" fill="#1e90ff"/>
+        <text x="75" y="702" fill="#a0a0b0" font-size="10">Data Sources</text>
+
+        <rect x="55" y="712" width="12" height="12" rx="3" fill="#2ed573"/>
+        <text x="75" y="722" fill="#a0a0b0" font-size="10">Output / Export</text>
+
+        <rect x="150" y="672" width="12" height="12" rx="3" fill="#ffa502"/>
+        <text x="170" y="682" fill="#a0a0b0" font-size="10">Frontend</text>
+
+        <rect x="150" y="692" width="12" height="12" rx="3" fill="#6c6c80"/>
+        <text x="170" y="702" fill="#a0a0b0" font-size="10">Storage</text>
+
+        <!-- Arrow marker definition -->
+        <defs>
+            <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                <polygon points="0 0, 10 3.5, 0 7" fill="#00d4aa"/>
+            </marker>
+        </defs>
+    </svg>
+</body>
+</html>
