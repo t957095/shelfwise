@@ -68,7 +68,6 @@ SOURCE_WEIGHTS = {
     "UPCDatabase": 0.50,
     "Brave Search": 0.45,
     "Google Search": 0.40,
-    "Demo Fallback": 0.40,
 }
 
 STOPWORDS = {"the", "a", "an", "and", "or", "of", "in", "on", "at", "to", "for", "with", "by"}
@@ -655,10 +654,6 @@ Rules:
         unique_agreeing = len(set(name_sources))
         if unique_agreeing > 1:
             confidence += min(0.05 * (unique_agreeing - 1), 0.15)
-
-        source_names = {s.get("source", "") for s, _ in weighted_sources}
-        if source_names == {"Demo Fallback"}:
-            confidence -= 0.3
 
         return max(0.0, min(1.0, confidence))
 

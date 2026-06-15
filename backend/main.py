@@ -42,7 +42,6 @@ from backend.foundry_iq import FoundryIQService, get_foundry_iq_service
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("shelfwise")
 
-DEMO_UPCS = ["049000050103", "022000020806", "012000001307"]
 http_client: Optional[httpx.AsyncClient] = None
 scraper: Optional[UPCScraper] = None
 agent: Optional[ProductReasoningAgent] = None
@@ -57,7 +56,7 @@ _scrape_times: List[float] = []
 async def lifespan(app: FastAPI):
     global http_client, scraper, foundry_iq, agent
     init_db()
-    http_client = httpx.AsyncClient(timeout=30.0, limits=httpx.Limits(max_connections=300, max_keepalive_connections=100))
+    http_client = httpx.AsyncClient(timeout=30.0, limits=httpx.Limits(max_connections=100, max_keepalive_connections=50))
     scraper = UPCScraper(http_client)
     foundry_iq = get_foundry_iq_service(db_path="shelfwise.db")
     agent = ProductReasoningAgent(foundry_iq_service=foundry_iq)
@@ -83,7 +82,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8000", "http://localhost:3000", "http://127.0.0.1:8000"],
+    allow_origins=["http://localhost:8000", "http://localhost:3000", "http://127.0.0.1:8000", "http://192.168.1.218:8000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -171,7 +170,6 @@ async def root():
         "endpoints": [
             {"path": "/", "method": "GET", "description": "App info"},
             {"path": "/app", "method": "GET", "description": "Web application"},
-            {"path": "/api/demo", "method": "GET", "description": "Load demo products"},
             {"path": "/api/batch", "method": "POST", "description": "Submit UPCs for processing"},
             {"path": "/api/upload-csv", "method": "POST", "description": "Upload CSV with 'upc' column"},
             {"path": "/api/products", "method": "GET", "description": "Get all products"},
@@ -185,124 +183,6 @@ async def root():
         ],
     }
 
-
-DEMO_PRODUCTS = [
-    {
-        "upc": "049000050103", "name": "Coca-Cola Classic", "brand": "Coca-Cola",
-        "category": "Colas",
-        "description": "Coca-Cola Classic - The original and refreshing taste. 2 liter bottle. Perfect for parties, gatherings, and everyday enjoyment.",
-        "image_url": "https://images.openfoodfacts.org/images/products/004/900/005/0103/front_en.96.400.jpg",
-        "images": [
-            {"url": "https://images.openfoodfacts.org/images/products/004/900/005/0103/front_en.96.400.jpg", "source": "Open Food Facts", "score": 0.9},
-            {"url": "https://pics.walgreens.com/prodimg/416899/450.jpg", "source": "UPCItemDB", "score": 0.85},
-        ],
-        "attributes": {"size": "2 Liter", "flavor": "Original", "container": "Bottle", "color": "Red"},
-        "confidence": 0.95, "status": "complete",
-        "citations": [
-            {"source": "Open Food Facts", "source_url": "https://world.openfoodfacts.org/api/v2/product/049000050103.json", "fields": ["name", "brand", "category", "images", "attributes"], "confidence": 0.9, "note": "Primary source with full product data"},
-            {"source": "UPCItemDB", "source_url": "https://api.upcitemdb.com/prod/trial/lookup?upc=049000050103", "fields": ["name", "brand", "images"], "confidence": 0.85, "note": "Confirmed name and brand"},
-        ],
-        "reasoning_trace": [
-            "Starting consolidation for UPC 049000050103",
-            "Weighted 4 sources: Open Food Facts(0.90), UPCItemDB(0.85), Go-UPC(0.30), Buycott(0.30)",
-            "Resolved name: 'Coca-Cola Classic' from ['Open Food Facts', 'UPCItemDB']",
-            "Resolved brand: 'Coca-Cola' from ['Open Food Facts']",
-            "Resolved category: 'Colas' from ['Open Food Facts']",
-            "Merged 4 attributes from all sources",
-            "Generated description (112 chars)",
-            "Selected 2 images, best: True",
-            "Computed confidence: 0.95",
-            "Generated 2 citations",
-            "Status: complete"
-        ]
-    },
-    {
-        "upc": "022000020806", "name": "M&M's Milk Chocolate", "brand": "Mars",
-        "category": "Candy & Chocolate",
-        "description": "M&M's Milk Chocolate - Colorful candy-coated chocolates in a convenient sharing size bag. A classic American snack since 1941.",
-        "image_url": "https://target.scene7.com/is/image/Target/GUEST_3d2ee4ac-ace5-4e21-86c2-575d2f5a4f11?wid=488&hei=488&fmt=pjpeg",
-        "images": [
-            {"url": "https://target.scene7.com/is/image/Target/GUEST_3d2ee4ac-ace5-4e21-86c2-575d2f5a4f11?wid=488&hei=488&fmt=pjpeg", "source": "Target", "score": 0.8},
-            {"url": "https://i5.walmartimages.com/asr/5e0e2e2e-2e2e-2e2e-2e2e-2e2e2e2e2e2e_1.2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e.jpeg", "source": "Walmart", "score": 0.75},
-        ],
-        "attributes": {"size": "1.69 oz", "flavor": "Milk Chocolate", "container": "Bag", "type": "Candy"},
-        "confidence": 0.92, "status": "complete",
-        "citations": [
-            {"source": "UPCItemDB", "source_url": "https://api.upcitemdb.com/prod/trial/lookup?upc=022000020806", "fields": ["name", "brand", "category", "images"], "confidence": 0.85, "note": "Full product record with images"},
-            {"source": "Buycott", "source_url": "https://www.buycott.com/upc/022000020806", "fields": ["name", "brand"], "confidence": 0.7, "note": "Confirmed brand ownership"},
-        ],
-        "reasoning_trace": [
-            "Starting consolidation for UPC 022000020806",
-            "Weighted 3 sources: UPCItemDB(0.85), Buycott(0.70), Go-UPC(0.30)",
-            "Resolved name: 'M&M's Milk Chocolate' from ['UPCItemDB']",
-            "Resolved brand: 'Mars' from ['UPCItemDB', 'Buycott']",
-            "Resolved category: 'Candy & Chocolate' from ['UPCItemDB']",
-            "Merged 4 attributes from all sources",
-            "Generated description (108 chars)",
-            "Selected 2 images, best: True",
-            "Computed confidence: 0.92",
-            "Generated 2 citations",
-            "Status: complete"
-        ]
-    },
-    {
-        "upc": "012000001307", "name": "Pepsi Light", "brand": "Pepsi",
-        "category": "Soda",
-        "description": "Pepsi Light - Refreshing diet cola with zero sugar and zero calories. 20 fl oz bottle.",
-        "image_url": "https://images.openfoodfacts.org/images/products/001/200/000/1307/front_fr.5.400.jpg",
-        "images": [
-            {"url": "https://images.openfoodfacts.org/images/products/001/200/000/1307/front_fr.5.400.jpg", "source": "Open Food Facts", "score": 0.9},
-            {"url": "https://i5.walmartimages.com/asr/c0294df7-bb4a-4545-96a4-548993338765_1.99f18eeb42d60ab95f50a7ae7fcf25d3.jpeg", "source": "Walmart", "score": 0.85},
-        ],
-        "attributes": {"size": "20 fl oz", "flavor": "Diet Cola", "container": "Bottle", "calories": "0"},
-        "confidence": 0.93, "status": "complete",
-        "citations": [
-            {"source": "Open Food Facts", "source_url": "https://world.openfoodfacts.org/api/v2/product/012000001307.json", "fields": ["name", "brand", "images", "attributes"], "confidence": 0.9, "note": "Primary source with nutrition data"},
-            {"source": "UPCItemDB", "source_url": "https://api.upcitemdb.com/prod/trial/lookup?upc=012000001307", "fields": ["name", "brand", "category"], "confidence": 0.85, "note": "Confirmed category and brand"},
-        ],
-        "reasoning_trace": [
-            "Starting consolidation for UPC 012000001307",
-            "Weighted 4 sources: Open Food Facts(0.90), UPCItemDB(0.85), Go-UPC(0.30), Buycott(0.30)",
-            "Resolved name: 'Pepsi Light' from ['Open Food Facts']",
-            "Resolved brand: 'Pepsi' from ['Open Food Facts', 'UPCItemDB']",
-            "Resolved category: 'Soda' from ['UPCItemDB']",
-            "Merged 4 attributes from all sources",
-            "Generated description (78 chars)",
-            "Selected 2 images, best: True",
-            "Computed confidence: 0.93",
-            "Generated 2 citations",
-            "Status: complete"
-        ]
-    },
-]
-
-
-@app.get("/api/demo")
-async def demo(background_tasks: BackgroundTasks):
-    job_id = create_job(DEMO_UPCS)
-    from backend.database import _get_connection
-    conn = _get_connection()
-    for product_data in DEMO_PRODUCTS:
-        conn.execute(
-            """INSERT OR REPLACE INTO products (upc, name, brand, category, confidence, status, data, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))""",
-            (
-                product_data["upc"],
-                product_data["name"],
-                product_data.get("brand"),
-                product_data.get("category"),
-                product_data.get("confidence", 0),
-                product_data.get("status", "complete"),
-                json.dumps(product_data),
-            ),
-        )
-    conn.execute(
-        """UPDATE jobs SET completed = ?, queued = 0, running = 0, failed = 0, updated_at = datetime('now') WHERE job_id = ?""",
-        (len(DEMO_UPCS), job_id),
-    )
-    conn.commit()
-    job = get_job(job_id)
-    return {"message": "Demo products loaded", "job_id": job_id, "upcs": DEMO_UPCS, "job": job}
 
 
 @app.post("/api/batch")

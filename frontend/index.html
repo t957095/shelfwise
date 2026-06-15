@@ -30,7 +30,7 @@
                     <label for="upc-textarea">Enter UPC Codes (one per line)</label>
                     <textarea
                         id="upc-textarea"
-                        placeholder="049000050103&#10;022000020806&#10;012000001307"
+                        placeholder="Enter UPC codes here..."
                         rows="4"
                         aria-describedby="upc-help"
                     ></textarea>
@@ -51,9 +51,6 @@
                 <div class="button-group">
                     <button id="submit-btn" class="btn btn-primary" aria-label="Submit UPC codes for processing">
                         <span>⚡</span> Submit UPCs
-                    </button>
-                    <button id="demo-btn" class="btn btn-secondary" aria-label="Load demo products">
-                        <span>🎯</span> Load Demo
                     </button>
                 </div>
             </section>
@@ -120,7 +117,7 @@
                     <div class="empty-state" style="grid-column: 1 / -1;">
                         <div class="icon">📦</div>
                         <h3>No products yet</h3>
-                        <p>Enter UPC codes above or load the demo to get started</p>
+                        <p>Enter UPC codes above to get started</p>
                     </div>
                 </div>
             </section>

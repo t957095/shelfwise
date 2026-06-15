@@ -15,7 +15,7 @@ let products = [];
 const upcTextarea = document.getElementById('upc-textarea');
 const csvFileInput = document.getElementById('csv-file');
 const submitBtn = document.getElementById('submit-btn');
-const demoBtn = document.getElementById('demo-btn');
+
 const statusSection = document.getElementById('status-section');
 const productsGrid = document.getElementById('products-grid');
 const productCount = document.getElementById('product-count');
@@ -123,7 +123,7 @@ function setupKeyboardShortcuts() {
 
 function bindEvents() {
     submitBtn.addEventListener('click', handleSubmit);
-    demoBtn.addEventListener('click', handleDemo);
+
     document.getElementById('export-csv-btn').addEventListener('click', () => exportPortfolio('csv'));
     document.getElementById('export-json-btn').addEventListener('click', () => exportPortfolio('json'));
     document.getElementById('export-shopify-btn').addEventListener('click', () => exportPortfolio('shopify'));
@@ -283,15 +283,6 @@ async function submitUPCs(upcs) {
     startJobStream(data.job_id);
 }
 
-// Demo
-async function handleDemo() {
-    setLoading(true);
-    const res = await fetch(`${API_BASE}/api/demo`);
-    const data = await res.json();
-    showToast('Demo UPCs submitted', 'info');
-    startJobStream(data.job_id);
-}
-
 // SSE Streaming
 function startJobStream(jobId) {
     currentJobId = jobId;
@@ -376,7 +367,7 @@ function renderProducts() {
             <div class="empty-state" style="grid-column: 1 / -1;">
                 <div class="icon">📦</div>
                 <h3>No products yet</h3>
-                <p>Enter UPC codes above or load the demo to get started</p>
+                <p>Enter UPC codes above to get started</p>
             </div>
         `;
         return;
@@ -588,7 +579,6 @@ async function exportPortfolio(format) {
 // Loading state
 function setLoading(loading) {
     submitBtn.disabled = loading;
-    demoBtn.disabled = loading;
     submitBtn.textContent = loading ? 'Processing...' : 'Submit UPCs';
 }
 

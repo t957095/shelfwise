@@ -15,6 +15,7 @@ import re
 import asyncio
 import logging
 import time
+import random
 from typing import List, Dict, Optional, Any, Callable
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
@@ -33,7 +34,6 @@ SOURCE_WEIGHTS = {
     "UPCDatabase": 0.50,
     "Brave Search": 0.45,
     "Google Search": 0.40,
-    "Demo Fallback": 0.40,
 }
 
 DEFAULT_HEADERS = {
@@ -41,51 +41,91 @@ DEFAULT_HEADERS = {
 }
 
 ROTATING_HEADERS = [
-    {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"},
-    {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"},
-    {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"},
+    {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "DNT": "1",
+        "Upgrade-Insecure-Requests": "1",
+        "Sec-Ch-Ua": '"Google Chrome";v="125", "Chromium";v="125", "Not.A/Brand";v="24"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"Windows"',
+    },
+    {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "DNT": "1",
+        "Upgrade-Insecure-Requests": "1",
+        "Sec-Ch-Ua": '"Google Chrome";v="125", "Chromium";v="125", "Not.A/Brand";v="24"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"macOS"',
+    },
+    {
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "DNT": "1",
+        "Upgrade-Insecure-Requests": "1",
+        "Sec-Ch-Ua": '"Google Chrome";v="125", "Chromium";v="125", "Not.A/Brand";v="24"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"Linux"',
+    },
+    {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Accept-Encoding": "gzip, deflate, br",
+        "DNT": "1",
+        "Upgrade-Insecure-Requests": "1",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+    },
+    {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "DNT": "1",
+        "Upgrade-Insecure-Requests": "1",
+    },
 ]
+
+# Concurrency / politeness knobs
+MAX_INFLIGHT_REQUESTS = 100
+MAX_PER_DOMAIN = 5
+DOMAIN_DELAY_SECONDS = 0.1
+MIN_SUCCESS_TO_STOP = 2
+UPC_TIME_BUDGET_SECONDS = 15.0
+MAX_RETRY_WAIT_SECONDS = 5.0
+
+# Names that are not real product titles and should not count toward early stop
+_BLOCKED_PRODUCT_NAMES = {
+    "check digit", "product not found", "unknown product", "not found",
+    "product", "unknown", "n/a", "na", "no data", "error",
+}
 
 # Circuit breaker state
 CIRCUIT_FAILURE_THRESHOLD = 5
 CIRCUIT_RECOVERY_TIMEOUT = 60.0
 
-# Demo fallback data for hackathon demo
-DEMO_FALLBACK_DATA = {
-    "049000050103": {
-        "source": "Demo Fallback",
-        "source_url": None,
-        "name": "Coca-Cola Classic",
-        "brand": "Coca-Cola",
-        "category": "Beverages",
-        "description": "Coca-Cola Classic 12 fl oz (355 mL) can. The iconic sparkling soft drink.",
-        "image_urls": [],
-        "attributes": {"size": "12 oz", "container": "Can", "flavor": "Classic"},
-        "raw": {"demo": True},
-    },
-    "022000020806": {
-        "source": "Demo Fallback",
-        "source_url": None,
-        "name": "M&M's Milk Chocolate",
-        "brand": "Mars",
-        "category": "Candy & Chocolate",
-        "description": "M&M's Milk Chocolate Candies, 1.69 oz (47.9 g) bag. Colorful candy-coated chocolate.",
-        "image_urls": [],
-        "attributes": {"size": "1.69 oz", "container": "Bag", "flavor": "Milk Chocolate"},
-        "raw": {"demo": True},
-    },
-    "012000001307": {
-        "source": "Demo Fallback",
-        "source_url": None,
-        "name": "Pepsi",
-        "brand": "Pepsi",
-        "category": "Beverages",
-        "description": "Pepsi Cola 12 fl oz (355 mL) can. Refreshing cola soft drink.",
-        "image_urls": [],
-        "attributes": {"size": "12 oz", "container": "Can", "flavor": "Cola"},
-        "raw": {"demo": True},
-    },
-}
+
+def _is_transient_error(e: Exception) -> bool:
+    """Decide whether an exception should count toward the circuit breaker."""
+    if isinstance(e, httpx.HTTPStatusError):
+        code = e.response.status_code
+        # 4xx client errors (except 429 rate-limit) are not transient
+        if 400 <= code < 500 and code != 429:
+            return False
+        return True
+    # Timeouts, connect errors, SSL issues, etc. are transient
+    if isinstance(e, (httpx.TimeoutException, httpx.ConnectError, httpx.NetworkError)):
+        return True
+    return False
 
 
 def _is_valid_image_url(url: str) -> bool:
@@ -134,12 +174,44 @@ class CircuitBreaker:
             return result
         except Exception as e:
             async with self._lock:
-                self.failures += 1
-                self.last_failure_time = time.time()
-                if self.failures >= self.failure_threshold:
+                if self.state == "half_open":
+                    # A single failure in half-open immediately reopens
                     self.state = "open"
-                    logger.warning(f"Circuit breaker {self.name}: OPEN after {self.failures} failures")
+                    self.last_failure_time = time.time()
+                    logger.warning(f"Circuit breaker {self.name}: re-opened from half-open")
+                    raise
+                if _is_transient_error(e):
+                    self.failures += 1
+                    self.last_failure_time = time.time()
+                    if self.failures >= self.failure_threshold:
+                        self.state = "open"
+                        logger.warning(f"Circuit breaker {self.name}: OPEN after {self.failures} transient failures")
+                else:
+                    # Non-transient failures don't count toward the breaker
+                    logger.debug(f"Circuit breaker {self.name}: non-transient failure ignored ({e})")
             raise
+
+
+class DomainLimiter:
+    """Simple per-domain concurrency + delay limiter."""
+
+    def __init__(self, max_concurrent: int = MAX_PER_DOMAIN, delay: float = DOMAIN_DELAY_SECONDS):
+        self.sem = asyncio.Semaphore(max_concurrent)
+        self.delay = delay
+        self._last_release: float = 0.0
+        self._lock = asyncio.Lock()
+
+    async def acquire(self):
+        await self.sem.acquire()
+        async with self._lock:
+            now = time.monotonic()
+            elapsed = now - self._last_release
+            if elapsed < self.delay:
+                await asyncio.sleep(self.delay - elapsed)
+            self._last_release = time.monotonic()
+
+    def release(self):
+        self.sem.release()
 
 
 class UPCScraper:
@@ -149,6 +221,16 @@ class UPCScraper:
         self._inflight: Dict[str, asyncio.Future] = {}
         self._inflight_lock = asyncio.Lock()
         self.circuits: Dict[str, CircuitBreaker] = {}
+        self._global_sem = asyncio.Semaphore(MAX_INFLIGHT_REQUESTS)
+        self._domain_limiters: Dict[str, DomainLimiter] = {}
+        self._domain_lock = asyncio.Lock()
+        self._dead_domains: set = set()
+
+    def _domain_limiter(self, url: str) -> DomainLimiter:
+        domain = urlparse(url).netloc.lower()
+        if domain not in self._domain_limiters:
+            self._domain_limiters[domain] = DomainLimiter()
+        return self._domain_limiters[domain]
 
     def _get_circuit(self, name: str) -> CircuitBreaker:
         if name not in self.circuits:
@@ -160,28 +242,71 @@ class UPCScraper:
         self.request_count += 1
         return headers
 
-    async def _get_with_retry(self, url: str, timeout: float = 10.0, retries: int = 2,
+    def _is_dead_domain(self, url: str) -> bool:
+        return urlparse(url).netloc.lower() in self._dead_domains
+
+    async def _get_with_retry(self, url: str, timeout: float = 10.0, retries: int = 1,
                               **kwargs) -> httpx.Response:
-        """GET with exponential backoff retry."""
-        last_error = None
+        """GET with polite concurrency control and status-aware exponential backoff.
+
+        Design goals:
+        - Fail fast on 4xx client errors (including 429) — retrying wastes time.
+        - Retry transient 5xx/server errors once with a capped wait.
+        - Never retry unresolvable/dead domains or SSL cert failures.
+        """
         # Build headers from kwarg or default
         headers = kwargs.pop("headers", DEFAULT_HEADERS)
         if isinstance(headers, dict):
             headers = dict(headers)  # copy
         else:
             headers = dict(DEFAULT_HEADERS)
+
+        domain = urlparse(url).netloc.lower()
+        if domain in self._dead_domains:
+            raise httpx.ConnectError(f"Skipping known dead domain: {domain}")
+
+        domain_limiter = self._domain_limiter(url)
+
         for attempt in range(retries + 1):
             try:
-                response = await self.client.get(url, headers=headers, timeout=timeout, **kwargs)
-                response.raise_for_status()
-                return response
-            except Exception as e:
-                last_error = e
+                async with self._global_sem:
+                    await domain_limiter.acquire()
+                    try:
+                        response = await self.client.get(url, headers=headers, timeout=timeout, **kwargs)
+                        response.raise_for_status()
+                        return response
+                    finally:
+                        domain_limiter.release()
+            except httpx.HTTPStatusError as e:
+                status = e.response.status_code
+                # All 4xx (including 429) are client errors; retrying rarely helps.
+                if 400 <= status < 500:
+                    raise
+                # 5xx and rare 3xx errors get one short retry.
                 if attempt < retries:
-                    wait = 2 ** attempt
-                    logger.warning(f"Retry {attempt + 1}/{retries} for {url}: {e}")
+                    wait = min(2 ** attempt + random.uniform(0, 1), MAX_RETRY_WAIT_SECONDS)
+                    logger.debug(f"Retry {attempt + 1}/{retries} for {url} (HTTP {status}): sleeping {wait:.1f}s")
                     await asyncio.sleep(wait)
-        raise last_error
+                else:
+                    raise
+            except (httpx.TimeoutException, httpx.ConnectError, httpx.NetworkError) as e:
+                err_text = str(e).lower()
+                # Dead domains / bad SSL are permanent; mark and fail fast.
+                if any(marker in err_text for marker in ("getaddrinfo", "name or service not known",
+                                                         "nodename nor servprovided", "certificate verify failed")):
+                    self._dead_domains.add(domain)
+                    raise
+                if attempt < retries:
+                    wait = min(2 ** attempt + random.uniform(0, 1), MAX_RETRY_WAIT_SECONDS)
+                    logger.debug(f"Retry {attempt + 1}/{retries} for {url}: {e}")
+                    await asyncio.sleep(wait)
+                else:
+                    raise
+            except Exception:
+                # Unknown errors are not worth retrying.
+                raise
+        # Unreachable — each branch either returns or raises.
+        raise RuntimeError("_get_with_retry exhausted without result")
 
     async def scrape_all(self, upc: str) -> List[Dict[str, Any]]:
         """Scrape all sources for a UPC with request coalescing.
@@ -206,67 +331,116 @@ class UPCScraper:
                     del self._inflight[upc]
 
     async def _scrape_all_impl(self, upc: str) -> List[Dict[str, Any]]:
-        """Internal: scrape all sources concurrently including registry sources."""
+        """Internal: scrape sources with bounded concurrency, politeness, and early stopping."""
         results = []
         start = time.time()
 
         # Core hardcoded scrapers (proven, high-quality parsers)
         core_scrapers = [
-            ("Open Food Facts", self._open_food_facts),
-            ("UPCItemDB", self._upcitemdb),
-            ("BarcodeLookup", self._barcode_lookup),
-            ("Go-UPC", self._go_upc),
-            ("Buycott", self._buycott),
-            ("EANdata", self._eandata),
-            ("Lookify", self._lookify),
-            ("UPCDatabase", self._upcdatabase),
-            ("Brave Search", self._brave_search),
-            ("Google Search", self._google_search),
+            ("Open Food Facts", self._open_food_facts, 0.90),
+            ("UPCItemDB", self._upcitemdb, 0.85),
+            ("BarcodeLookup", self._barcode_lookup, 0.75),
+            ("Go-UPC", self._go_upc, 0.70),
+            ("Buycott", self._buycott, 0.65),
+            ("EANdata", self._eandata, 0.60),
+            ("Lookify", self._lookify, 0.55),
+            ("UPCDatabase", self._upcdatabase, 0.50),
+            ("Brave Search", self._brave_search, 0.45),
+            ("Google Search", self._google_search, 0.40),
         ]
-        
-        # Dynamic registry scrapers (100+ additional sources)
+
+        # Dynamic registry scrapers (hundreds of additional sources)
         registry_sources = self._get_registry_sources()
-        # Pair each source with its scraper to preserve weight for sorting
-        registry_pairs = [
-            (src, self._make_registry_scraper(src))
+        registry_scrapers = [
+            (src["name"], self._make_registry_scraper(src), src.get("weight", 0.30))
             for src in registry_sources
         ]
-        
-        # Combine all scrapers: core + registry
-        all_scrapers = core_scrapers + [(src["name"], fn) for src, fn in registry_pairs]
-        
+
         # Deduplicate by source name (registry may duplicate core sources)
         seen_names = set()
         unique_scrapers = []
-        for name, fn in all_scrapers:
+        for name, fn, weight in core_scrapers + registry_scrapers:
             if name not in seen_names:
                 seen_names.add(name)
-                unique_scrapers.append((name, fn))
+                unique_scrapers.append((name, fn, weight))
 
-        # Run all unique sources up to a safety ceiling of 300
-        max_concurrent = 300
-        if len(unique_scrapers) > max_concurrent:
-            sorted_registry = sorted(registry_pairs, key=lambda p: p[0].get("weight", 0.3), reverse=True)
-            core_names = {n for n, _ in core_scrapers}
-            extra_registry = [(src["name"], fn) for src, fn in sorted_registry if src["name"] not in core_names]
-            unique_scrapers = core_scrapers + extra_registry[:max_concurrent - len(core_scrapers)]
+        # Sort by weight descending so high-confidence sources run first
+        unique_scrapers.sort(key=lambda x: x[2], reverse=True)
 
-        tasks = [self._safe_scrape(name, fn, upc) for name, fn in unique_scrapers]
-        source_results = await asyncio.gather(*tasks, return_exceptions=True)
+        # Hard ceiling for safety
+        max_sources = 300
+        if len(unique_scrapers) > max_sources:
+            unique_scrapers = unique_scrapers[:max_sources]
 
-        for r in source_results:
-            if isinstance(r, dict):
-                results.append(r)
+        def _is_real_success(r: Dict[str, Any]) -> bool:
+            if not r.get("success"):
+                return False
+            name = str(r.get("name", "")).strip().lower()
+            if not name or name in _BLOCKED_PRODUCT_NAMES:
+                return False
+            return True
+
+        def _enough_success() -> bool:
+            return sum(1 for r in results if _is_real_success(r)) >= MIN_SUCCESS_TO_STOP
+
+        sem = asyncio.Semaphore(MAX_INFLIGHT_REQUESTS)
+
+        async def bounded_scrape(name, fn):
+            async with sem:
+                return await self._safe_scrape(name, fn, upc)
+
+        # Launch all tasks bounded by the semaphore; high-weight tasks start first
+        pending = set()
+        for name, fn, _ in unique_scrapers:
+            task = asyncio.create_task(bounded_scrape(name, fn))
+            pending.add(task)
+            # Don't queue more than 2x the concurrency limit ahead of time
+            if len(pending) >= MAX_INFLIGHT_REQUESTS * 2:
+                done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+                for task in done:
+                    r = task.result()
+                    if isinstance(r, dict):
+                        results.append(r)
+                if _enough_success():
+                    break
+
+        # Process remaining tasks as they complete
+        while pending:
+            done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+            for task in done:
+                r = task.result()
+                if isinstance(r, dict):
+                    results.append(r)
+
+            elapsed = time.time() - start
+            successful = sum(1 for r in results if r.get("success"))
+            logger.debug(f"UPC {upc}: {successful}/{len(results)} successful, {elapsed:.1f}s")
+
+            if _enough_success():
+                logger.info(f"UPC {upc}: early stop after {len(results)} sources ({successful} successful)")
+                for task in pending:
+                    task.cancel()
+                try:
+                    await asyncio.gather(*pending, return_exceptions=True)
+                except Exception:
+                    pass
+                break
+
+            # Hard time budget for obscure products
+            if elapsed > UPC_TIME_BUDGET_SECONDS:
+                logger.info(f"UPC {upc}: time budget reached after {len(results)} sources")
+                for task in pending:
+                    task.cancel()
+                try:
+                    await asyncio.gather(*pending, return_exceptions=True)
+                except Exception:
+                    pass
+                break
 
         elapsed = time.time() - start
-        total_sources = len(unique_scrapers)
+        total_sources = len(results)
         successful = sum(1 for r in results if r.get("success"))
         logger.info(f"UPC {upc}: scraped {successful}/{total_sources} sources in {elapsed:.2f}s")
-
-        if not results:
-            fallback = self._get_demo_fallback(upc)
-            if fallback:
-                results.append(fallback)
 
         return results
     
@@ -295,7 +469,7 @@ class UPCScraper:
         source_type = source_def.get("type", "html")
         url_template = source_def.get("url_template", "")
         method = source_def.get("method", "GET")
-        timeout = source_def.get("timeout", 10)
+        timeout = source_def.get("timeout", 8)
         
         if not url_template:
             return self._fail(source_name, "", {}, "No URL template")
@@ -876,15 +1050,6 @@ class UPCScraper:
                 "success": True, "error": None,
             }
 
-    def _get_demo_fallback(self, upc: str) -> Optional[Dict[str, Any]]:
-        demo = DEMO_FALLBACK_DATA.get(upc)
-        if not demo:
-            return None
-        result = dict(demo)
-        result["upc"] = upc
-        result["success"] = True
-        result["error"] = None
-        return result
 
     @staticmethod
     def _fail(source: str, url: str, raw: dict, error: str) -> Dict[str, Any]:
