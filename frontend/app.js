@@ -132,6 +132,9 @@ function bindEvents() {
     document.getElementById('export-ebay-btn').addEventListener('click', () => exportPortfolio('ebay'));
     document.getElementById('export-etsy-btn').addEventListener('click', () => exportPortfolio('etsy'));
     document.getElementById('export-bigcommerce-btn').addEventListener('click', () => exportPortfolio('bigcommerce'));
+    document.getElementById('export-doordash-btn').addEventListener('click', () => exportPortfolio('doordash'));
+    document.getElementById('export-ubereats-btn').addEventListener('click', () => exportPortfolio('ubereats'));
+    document.getElementById('export-grubhub-btn').addEventListener('click', () => exportPortfolio('grubhub'));
 
     const sortSelect = document.getElementById('sort-select');
     if (sortSelect) {

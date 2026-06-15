@@ -12,7 +12,7 @@
 
 ## The Problem
 
-Small businesses that buy liquidation pallets, wholesale lots, or estate sales often receive hundreds or thousands of items with nothing but a UPC barcode. Turning those barcodes into e-commerce-ready listings is a manual, soul-crushing process. Most owners give up and sell bulk-only, leaving 30-40% of potential revenue on the table.
+Small businesses that buy liquidation pallets, wholesale lots, or estate sales often receive hundreds or thousands of items with nothing but a UPC barcode. Turning those barcodes into e-commerce-ready listings is a manual, soul-crushing process. Restaurants, ghost kitchens, and convenience stores that list on DoorDash, Uber Eats, or Grubhub face the same problem: POS exports full of UPCs with no photos or descriptions. Most owners give up and list only a fraction of their catalog, leaving 30-40% of potential revenue on the table.
 
 This is not a hypothetical. Walk through any liquidation warehouse and you will see pallets sitting for months because nobody has time to look up each item, write descriptions, find images, and format listings for Shopify, Amazon, or eBay.
 
@@ -26,7 +26,7 @@ ShelfWise transforms a list of UPC codes into a complete, exportable product por
 - **Verified product imagery** - Downloads and scores every candidate photo for white/clean backgrounds, resolution, central product focus, and deduplication
 - **Foundry IQ integration** - Optional Azure OpenAI enrichment with JSON-structured responses and full citation trails
 - **Real-time SSE streaming** - Watch each UPC get processed live with progress bars
-- **8 export formats** - CSV, JSON, Shopify, Amazon, WooCommerce, eBay, Etsy, BigCommerce
+- **11 export formats** - CSV, JSON, Shopify, Amazon, WooCommerce, eBay, Etsy, BigCommerce, DoorDash, Uber Eats, Grubhub
 - **Accessibility-first** - WCAG 2.1 AA compliant, keyboard navigation, screen reader support, reduced motion support
 
 ## Demo Video

@@ -2,7 +2,7 @@
 
 **Agents League Hackathon 2026 — Reasoning Agents Track**
 
-ShelfWise turns a list of UPC barcodes into a complete, e-commerce-ready product portfolio. It is built around a **Microsoft Foundry IQ-style reasoning layer** that gathers multi-source evidence, resolves conflicts, generates cited product records, and exports them to Shopify, Amazon, WooCommerce, eBay, Etsy, BigCommerce, or CSV/JSON.
+ShelfWise turns a list of UPC barcodes into a complete, marketplace-ready product portfolio. It is built around a **Microsoft Foundry IQ-style reasoning layer** that gathers multi-source evidence, resolves conflicts, generates cited product records, and exports them to Shopify, Amazon, WooCommerce, eBay, Etsy, BigCommerce, DoorDash, Uber Eats, Grubhub, or CSV/JSON.
 
 ## Foundry IQ Integration
 
@@ -30,8 +30,8 @@ Only images that pass verification are surfaced as the product's gallery, with t
 2. The scraper collects structured and unstructured evidence from dozens of sources in parallel.
 3. The reasoning agent weights, deduplicates, and resolves the evidence into a single consolidated record.
 4. Verified images are selected and ranked.
-5. The record is stored in SQLite, streamed to the frontend via SSE, and exported to the marketplace format of choice.
+5. The record is stored in SQLite, streamed to the frontend via SSE, and exported to the marketplace format of choice — including native formats for food-delivery platforms.
 
 ## Why It Matters
 
-Liquidation buyers, estate-sale resellers, and small wholesalers often receive pallets of items with only a UPC. Manually researching each item is too slow, so valuable inventory sits unsold. ShelfWise automates the research, produces trustworthy, cited listings, and ensures the photos are clean enough for consumer marketplaces — turning barcodes into revenue in minutes.
+Restaurants, ghost kitchens, and convenience stores that list on DoorDash, Uber Eats, or Grubhub often receive CSV files from their POS system with hundreds of UPCs and no photos. Manually researching each item — finding the right name, description, and clean photo — is too slow, so menus and catalogs stay incomplete. ShelfWise automates the research, produces trustworthy, cited listings with verified imagery, and exports directly to the delivery platform's format — turning a POS export into a complete online catalog in minutes.

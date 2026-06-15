@@ -469,8 +469,35 @@ async def export_portfolio(request: ExportRequest):
         output.seek(0)
         return StreamingResponse(io.BytesIO(output.getvalue().encode('utf-8')), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=shelfwise-bigcommerce.csv"})
 
+    elif fmt == "doordash":
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["Merchant ID", "Item ID", "Item Name", "Description", "Category", "Price", "Image URL", "UPC", "Status"])
+        for p in products:
+            writer.writerow(["", p.get("upc", ""), p.get("name", ""), p.get("description", ""), p.get("category", ""), "", p.get("image_url", ""), p.get("upc", ""), "Active"])
+        output.seek(0)
+        return StreamingResponse(io.BytesIO(output.getvalue().encode('utf-8')), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=shelfwise-doordash.csv"})
+
+    elif fmt == "ubereats":
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["Menu ID", "Section", "Item Name", "Item Description", "Price", "Image URL", "External ID", "Dietary Tags"])
+        for p in products:
+            writer.writerow(["", p.get("category", ""), p.get("name", ""), p.get("description", ""), "", p.get("image_url", ""), p.get("upc", ""), ""])
+        output.seek(0)
+        return StreamingResponse(io.BytesIO(output.getvalue().encode('utf-8')), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=shelfwise-ubereats.csv"})
+
+    elif fmt == "grubhub":
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["Restaurant ID", "Menu Item ID", "Item Name", "Description", "Category", "Price", "Image URL", "UPC", "Enabled"])
+        for p in products:
+            writer.writerow(["", p.get("upc", ""), p.get("name", ""), p.get("description", ""), p.get("category", ""), "", p.get("image_url", ""), p.get("upc", ""), "TRUE"])
+        output.seek(0)
+        return StreamingResponse(io.BytesIO(output.getvalue().encode('utf-8')), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=shelfwise-grubhub.csv"})
+
     else:
-        raise HTTPException(status_code=400, detail="Format must be one of: csv, json, shopify, amazon, woocommerce, ebay, etsy, bigcommerce")
+        raise HTTPException(status_code=400, detail="Format must be one of: csv, json, shopify, amazon, woocommerce, ebay, etsy, bigcommerce, doordash, ubereats, grubhub")
 
 
 @app.get("/api/jobs/{job_id}")

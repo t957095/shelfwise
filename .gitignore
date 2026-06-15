@@ -50,6 +50,12 @@ shelfwise.db
 # Logs
 *.log
 
+# Demo video artifacts
+*.mp4
+*_filter.txt
+concat_list.txt
+arial.ttf
+
 # OS
 .DS_Store
 Thumbs.db
