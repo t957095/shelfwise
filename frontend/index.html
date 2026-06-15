@@ -38,14 +38,36 @@
                 </div>
 
                 <div class="input-group">
-                    <label for="csv-file">Or Upload CSV (must have 'upc' column)</label>
+                    <label for="csv-file">Or Upload POS CSV</label>
                     <input
                         type="file"
                         id="csv-file"
                         accept=".csv"
                         aria-describedby="csv-help"
                     >
-                    <span id="csv-help" style="display: block; color: var(--text-muted); font-size: 0.8rem; margin-top: 4px;">Drag and drop supported. CSV must contain a column named 'upc'.</span>
+                    <span id="csv-help" style="display: block; color: var(--text-muted); font-size: 0.8rem; margin-top: 4px;">Auto-detects UPC/EAN/SKU/PLU columns. Drag and drop supported.</span>
+                </div>
+
+                <div id="csv-preview" class="csv-preview" style="display: none;" aria-live="polite">
+                    <h4>CSV Preview</h4>
+                    <p id="csv-preview-summary"></p>
+                    <ul id="csv-preview-samples"></ul>
+                    <div class="csv-preview-actions">
+                        <label for="csv-max-rows">Process up to:</label>
+                        <select id="csv-max-rows" aria-label="Maximum rows to process">
+                            <option value="10" selected>10 rows (demo)</option>
+                            <option value="50">50 rows</option>
+                            <option value="100">100 rows</option>
+                            <option value="500">500 rows</option>
+                            <option value="1000">1,000 rows</option>
+                        </select>
+                        <button id="csv-preview-process" class="btn btn-primary" aria-label="Process previewed CSV">
+                            <span>🚀</span> Process CSV
+                        </button>
+                        <button id="csv-preview-cancel" class="btn btn-secondary" aria-label="Cancel CSV upload">
+                            Cancel
+                        </button>
+                    </div>
                 </div>
 
                 <div class="button-group">

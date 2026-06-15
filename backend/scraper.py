@@ -232,8 +232,11 @@ class UPCScraper:
             ("Google Search", self._google_search),
         ]
 
-        # Dynamic registry scrapers (limit to top weighted sources for speed/quality)
-        registry_sources = self._get_registry_sources(max_sources=30)
+        # Dynamic registry scrapers (limit to top weighted sources for speed/quality).
+        # Default to 10 registry sources per scrape to keep live demos responsive;
+        # override with SHELFWISE_MAX_REGISTRY_SOURCES env var.
+        registry_max = int(os.environ.get("SHELFWISE_MAX_REGISTRY_SOURCES", "10"))
+        registry_sources = self._get_registry_sources(max_sources=registry_max)
         # Pair each source with its scraper to preserve weight for sorting
         registry_pairs = [(src, self._make_registry_scraper(src)) for src in registry_sources]
 

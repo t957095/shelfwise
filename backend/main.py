@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 
 load_dotenv(_project_root / ".env")
 
+import asyncio
 import csv
 import io
 import json
@@ -114,25 +115,68 @@ def get_scraper() -> UPCScraper:
     return scraper
 
 
-def _merge_seed_data(consolidated: Dict[str, Any], seed: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+def _is_local_plu(upc: str) -> bool:
+    """Return True for locally-assigned / variable-weight codes (e.g. starting with 2).
+
+    GS1 prefixes 2 and 02 are typically store/department-specific PLUs, not
+    globally registered products, so public UPC databases rarely have data.
+    """
+    return bool(upc) and upc.startswith("2")
+
+
+def _build_from_seed(upc: str, seed: Dict[str, Any]) -> Dict[str, Any]:
+    """Build a consolidated product directly from POS CSV seed data.
+
+    Used for local PLUs and other codes where public sources are unlikely to
+    have a match. Still produces the same record shape as scraped products.
+    """
+    return {
+        "upc": upc,
+        "name": seed.get("name") or f"Product {upc}",
+        "brand": seed.get("brand"),
+        "category": seed.get("category"),
+        "description": seed.get("description") or f"Product information for UPC {upc}",
+        "image_url": None,
+        "images": [],
+        "attributes": {"pos_price": seed["price"]} if "price" in seed else {},
+        "confidence": 0.75,
+        "status": "complete",
+        "citations": [
+            {
+                "source": "POS Upload",
+                "source_url": None,
+                "fields": [k for k in ("name", "brand", "category", "description", "price") if seed.get(k)],
+                "confidence": 0.75,
+                "note": "Seed data from uploaded POS CSV",
+            }
+        ],
+        "reasoning_trace": [f"Built record from POS CSV seed data for local PLU {upc}"],
+        "foundry_enriched": False,
+        "foundry_sdk": None,
+    }
+
+
+def _merge_seed_data(
+    consolidated: Dict[str, Any],
+    seed: Optional[Dict[str, Any]],
+    prefer_seed: bool = False,
+) -> Dict[str, Any]:
     """Merge CSV seed data into a consolidated product as fallback/enrichment.
 
-    Seed values are used when the scraper returns empty or low-confidence fields,
-    and price is always added as an attribute when present.
+    When prefer_seed=True (e.g. local PLUs), seed values override scraper values.
+    Otherwise scraper data wins and seed fills gaps. Price is always added.
     """
     if not seed:
         return consolidated
 
-    # Prefer scraper data, fall back to seed for core fields
     for field in ("name", "brand", "category", "description"):
-        if seed.get(field) and not consolidated.get(field):
-            consolidated[field] = seed[field]
+        if seed.get(field):
+            if prefer_seed or not consolidated.get(field):
+                consolidated[field] = seed[field]
 
-    # Price always goes into attributes if present
     if "price" in seed:
         consolidated.setdefault("attributes", {})["pos_price"] = seed["price"]
 
-    # Public image URLs from seed become candidates for the verifier
     if seed.get("image_urls"):
         existing = {img.get("url") for img in consolidated.get("images", [])}
         for url in seed["image_urls"]:
@@ -161,15 +205,42 @@ async def process_upc(upc: str, job_id: str, seed_data: Optional[Dict[str, Any]]
             update_job(job_id, "completed", 1)
             return
 
-        start = time.time()
-        s = get_scraper()
-        raw_data_list = await s.scrape_all(upc)
-        scrape_elapsed = time.time() - start
-        _scrape_times.append(scrape_elapsed)
-        logger.info(f"UPC {upc}: scraped {len(raw_data_list)} sources in {scrape_elapsed:.2f}s")
+        # Fast path for local PLUs with seed data: public UPC databases won't
+        # have these, so build directly from the POS CSV to keep demos fast.
+        if _is_local_plu(upc) and seed_data and seed_data.get("name"):
+            logger.info(f"UPC {upc}: local PLU fast path using seed data")
+            consolidated_dict = _build_from_seed(upc, seed_data)
+        else:
+            start = time.time()
+            s = get_scraper()
+            try:
+                # Cap total scrape time so slow registry sources don't stall demos.
+                # If we have seed data, fall back to it instead of failing.
+                raw_data_list = await asyncio.wait_for(s.scrape_all(upc), timeout=15.0)
+            except asyncio.TimeoutError:
+                logger.warning(f"UPC {upc}: scrape timed out after 15s")
+                if seed_data and seed_data.get("name"):
+                    consolidated_dict = _build_from_seed(upc, seed_data)
+                    consolidated_dict["reasoning_trace"].append("Scrape timed out; used POS CSV seed data")
+                    logger.info(f"UPC {upc}: falling back to seed data after timeout")
+                    scrape_elapsed = time.time() - start
+                    _scrape_times.append(scrape_elapsed)
+                    consolidated_dict = _merge_seed_data(consolidated_dict, seed_data, prefer_seed=True)
+                    logger.info(f"UPC {upc}: consolidated with confidence {consolidated_dict.get('confidence', 0)}")
+                    product = ConsolidatedProduct(**consolidated_dict)
+                    upsert_product(product)
+                    upc_cache.set(upc, consolidated_dict)
+                    update_job(job_id, "running", -1)
+                    update_job(job_id, "completed", 1)
+                    return
+                raw_data_list = []
+            scrape_elapsed = time.time() - start
+            _scrape_times.append(scrape_elapsed)
+            logger.info(f"UPC {upc}: scraped {len(raw_data_list)} sources in {scrape_elapsed:.2f}s")
 
-        consolidated_dict = await agent.consolidate(upc, raw_data_list)
-        consolidated_dict = _merge_seed_data(consolidated_dict, seed_data)
+            consolidated_dict = await agent.consolidate(upc, raw_data_list)
+            consolidated_dict = _merge_seed_data(consolidated_dict, seed_data, prefer_seed=_is_local_plu(upc))
+
         logger.info(f"UPC {upc}: consolidated with confidence {consolidated_dict.get('confidence', 0)}")
 
         product = ConsolidatedProduct(**consolidated_dict)
@@ -222,7 +293,12 @@ async def root():
             {"path": "/app", "method": "GET", "description": "Web application"},
             {"path": "/api/demo", "method": "GET", "description": "Load demo products"},
             {"path": "/api/batch", "method": "POST", "description": "Submit UPCs for processing"},
-            {"path": "/api/upload-csv", "method": "POST", "description": "Upload CSV with 'upc' column"},
+            {
+                "path": "/api/upload-csv",
+                "method": "POST",
+                "description": "Upload POS CSV with auto-detected UPC column",
+            },
+            {"path": "/api/upload-csv/preview", "method": "POST", "description": "Preview POS CSV before processing"},
             {"path": "/api/products", "method": "GET", "description": "Get all products"},
             {"path": "/api/products/{upc}", "method": "GET", "description": "Get single product"},
             {"path": "/api/export", "method": "POST", "description": "Export portfolio"},

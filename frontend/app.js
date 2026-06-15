@@ -20,6 +20,13 @@ const statusSection = document.getElementById('status-section');
 const productsGrid = document.getElementById('products-grid');
 const productCount = document.getElementById('product-count');
 const toastContainer = document.getElementById('toast-container');
+const csvPreview = document.getElementById('csv-preview');
+const csvPreviewSummary = document.getElementById('csv-preview-summary');
+const csvPreviewSamples = document.getElementById('csv-preview-samples');
+const csvMaxRows = document.getElementById('csv-max-rows');
+const csvPreviewProcess = document.getElementById('csv-preview-process');
+const csvPreviewCancel = document.getElementById('csv-preview-cancel');
+let pendingCsvFile = null;
 
 // Initialize
 function init() {
@@ -124,6 +131,11 @@ function setupKeyboardShortcuts() {
 function bindEvents() {
     submitBtn.addEventListener('click', handleSubmit);
     demoBtn.addEventListener('click', handleDemo);
+    csvFileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) previewCsv(e.target.files[0]);
+    });
+    csvPreviewProcess.addEventListener('click', processPreviewedCsv);
+    csvPreviewCancel.addEventListener('click', hideCsvPreview);
     document.getElementById('export-csv-btn').addEventListener('click', () => exportPortfolio('csv'));
     document.getElementById('export-json-btn').addEventListener('click', () => exportPortfolio('json'));
     document.getElementById('export-shopify-btn').addEventListener('click', () => exportPortfolio('shopify'));
@@ -195,12 +207,16 @@ function preventDefaults(e) {
     e.stopPropagation();
 }
 
-function handleDrop(e) {
+async function handleDrop(e) {
     const dt = e.dataTransfer;
     const files = dt.files;
     if (files.length > 0) {
         csvFileInput.files = files;
-        handleFileUpload(files[0]);
+        try {
+            await previewCsv(files[0]);
+        } catch (err) {
+            showToast(`Error: ${err.message}`, 'error');
+        }
     }
 }
 
@@ -250,11 +266,55 @@ async function handleSubmit() {
     }
 }
 
-async function handleFileUpload(file) {
+async function previewCsv(file) {
+    pendingCsvFile = file;
     const formData = new FormData();
     formData.append('file', file);
 
-    const res = await fetch(`${API_BASE}/api/upload-csv`, {
+    const res = await fetch(`${API_BASE}/api/upload-csv/preview?max_rows=5`, {
+        method: 'POST',
+        body: formData,
+    });
+
+    if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || 'Preview failed');
+    }
+
+    const data = await res.json();
+    const upcCol = data.detected_columns?.upc || 'unknown';
+    const summary = `Detected UPC column: <strong>${escapeHtml(upcCol)}</strong> · ${data.total_upcs} unique UPCs${data.truncated ? '+' : ''}`;
+    csvPreviewSummary.innerHTML = summary;
+
+    csvPreviewSamples.innerHTML = (data.sample || []).map(s => {
+        const name = s.seed?.name || 'Unknown product';
+        return `<li><strong>${escapeHtml(s.upc)}</strong> — ${escapeHtml(name)}</li>`;
+    }).join('');
+
+    csvPreview.style.display = 'block';
+    csvPreview.setAttribute('tabindex', '-1');
+    csvPreview.focus();
+}
+
+function hideCsvPreview() {
+    csvPreview.style.display = 'none';
+    csvPreviewSamples.innerHTML = '';
+    csvFileInput.value = '';
+    pendingCsvFile = null;
+}
+
+async function processPreviewedCsv() {
+    if (!pendingCsvFile) return;
+    hideCsvPreview();
+    setLoading(true);
+    await handleFileUpload(pendingCsvFile, csvMaxRows.value);
+}
+
+async function handleFileUpload(file, maxRows = '100') {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await fetch(`${API_BASE}/api/upload-csv?max_rows=${maxRows}`, {
         method: 'POST',
         body: formData,
     });

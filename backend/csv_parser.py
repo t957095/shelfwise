@@ -16,8 +16,9 @@ from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger("shelfwise.csv_parser")
 
-# Common header aliases seen in POS and inventory exports
-UPC_ALIASES = {
+# Common header aliases seen in POS and inventory exports.
+# Ordered by specificity: the first match wins.
+UPC_ALIASES = [
     "upc",
     "upc_code",
     "upc code",
@@ -43,11 +44,11 @@ UPC_ALIASES = {
     "product_id",
     "product id",
     "productid",
-    "id",
     "code",
-}
+    "id",
+]
 
-NAME_ALIASES = {
+NAME_ALIASES = [
     "product_name",
     "product name",
     "name",
@@ -57,18 +58,18 @@ NAME_ALIASES = {
     "description",
     "item_description",
     "item description",
-}
+]
 
-BRAND_ALIASES = {
+BRAND_ALIASES = [
     "brand",
     "brand_name",
     "brand name",
     "manufacturer",
     "vendor",
     "supplier",
-}
+]
 
-CATEGORY_ALIASES = {
+CATEGORY_ALIASES = [
     "category",
     "category_name",
     "category name",
@@ -77,9 +78,9 @@ CATEGORY_ALIASES = {
     "subcategory",
     "sub_category",
     "sub category",
-}
+]
 
-PRICE_ALIASES = {
+PRICE_ALIASES = [
     "price",
     "retail_price",
     "retail price",
@@ -89,7 +90,7 @@ PRICE_ALIASES = {
     "unit price",
     "cost",
     "msrp",
-}
+]
 
 IMAGE_ALIASES = [
     "image",
