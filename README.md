@@ -1,33 +1,39 @@
-# ShelfWise - AI Product Portfolio Builder
+# ShelfWise: AI Product Portfolio Builder for Small Businesses
 
-[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
+[![Python 3.14](https://img.shields.io/badge/python-3.14-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.md)
 [![Docker](https://img.shields.io/badge/docker-supported-2496ED.svg)](Dockerfile)
 
 > **Agents League Hackathon 2026 - Reasoning Agents Track**
 > Microsoft Foundry | Foundry IQ | Azure OpenAI
+>
+> Turn a spreadsheet of UPCs and SKUs into a complete, market-ready product catalog with verified photos, titles, and descriptions powered by multi-step reasoning and Microsoft Foundry IQ.
 
 ---
 
 ## The Problem
 
-Small businesses that buy liquidation pallets, wholesale lots, or estate sales often receive hundreds or thousands of items with nothing but a UPC barcode. Turning those barcodes into e-commerce-ready listings is a manual, soul-crushing process. Restaurants, ghost kitchens, and convenience stores that list on DoorDash, Uber Eats, or Grubhub face the same problem: POS exports full of UPCs with no photos or descriptions. Most owners give up and list only a fraction of their catalog, leaving 30-40% of potential revenue on the table.
+When someone buys a pallet of inventory, they often receive hundreds of products with nothing but UPC barcodes or internal SKUs on the packaging. Before they can sell anything online, they have to figure out what each item is — searching Google, checking marketplaces, comparing listings, finding product photos, copying specifications, and writing descriptions.
 
-This is not a hypothetical. Walk through any liquidation warehouse and you will see pallets sitting for months because nobody has time to look up each item, write descriptions, find images, and format listings for Shopify, Amazon, or eBay.
+At around 8 minutes per item, a pallet with 400 products can require more than 50 hours of manual work before anything is listed for sale. For many small businesses, that work never gets done. Inventory sits in storage instead of generating revenue.
 
 ## The Solution
 
-ShelfWise transforms a list of UPC codes into a complete, exportable product portfolio in minutes. It scrapes 8+ public data sources concurrently, runs a multi-step reasoning agent to consolidate conflicting information, generates cited product records, and exports directly to Shopify, Amazon, or generic CSV/JSON.
+ShelfWise turns a spreadsheet of UPCs and SKUs into a complete, market-ready product catalog. Users upload a CSV or paste identifiers directly into the app. The system searches across the web — retailer listings, manufacturer pages, marketplaces, specialty stores, distributor catalogs, and public product databases — to gather evidence for each product.
+
+A multi-step reasoning agent resolves conflicting names, deduplicates evidence, scores source reliability, and builds a cited product record. Verified images are ranked into a gallery of up to 5 marketplace-ready photos. The final catalog exports to Shopify, Amazon Seller Central, eBay, Facebook Marketplace, WooCommerce, Etsy, BigCommerce, DoorDash, Uber Eats, Grubhub, or generic CSV/JSON.
 
 **Key capabilities:**
-- **282 concurrent scrapers** - 8 core sources plus a registry of 270+ additional sources, queried in parallel and limited to the top-weighted sources for speed
-- **Multi-step reasoning agent** - Jaccard deduplication, source-weighted field resolution, confidence scoring
-- **Verified product imagery** - Downloads and scores every candidate photo for white/clean backgrounds, resolution, central product focus, sharpness, frame fill, and source validity, then returns a ranked gallery of up to 5 verified multi-angle photos per product
-- **Foundry IQ integration** - Optional Azure OpenAI enrichment with JSON-structured responses and full citation trails
-- **Real-time SSE streaming** - Watch each UPC get processed live with progress bars
-- **11 export formats** - CSV, JSON, Shopify, Amazon, WooCommerce, eBay, Etsy, BigCommerce, DoorDash, Uber Eats, Grubhub
-- **Accessibility-first** - WCAG 2.1 AA compliant, keyboard navigation, screen reader support, reduced motion support
+- **Web-wide evidence gathering** — 10 core sources plus a registry of 270+ additional sources, queried concurrently. Searches the broader web, not just a fixed UPC catalog.
+- **Multi-step reasoning agent** — Jaccard deduplication, weighted brand/category resolution, attribute normalization, confidence scoring, and grounded citations.
+- **Verified product imagery** — Downloads and scores every candidate photo for white/clean backgrounds, resolution, central product focus, sharpness, frame fill, and source validity, then returns a ranked gallery of up to 5 verified multi-angle photos per product.
+- **Name-based image search fallback** — When a barcode has no public match, ShelfWise searches the web by product name/brand and verifies those images.
+- **Manual upload & review** — Users can delete auto-selected images or upload their own through the image manager on each product card.
+- **Foundry IQ integration** — Optional Azure OpenAI enrichment with JSON-structured responses and full citation trails.
+- **Real-time SSE streaming** — Watch each UPC get processed live with progress bars.
+- **11 export formats** — CSV, JSON, Shopify, Amazon, WooCommerce, eBay, Etsy, BigCommerce, DoorDash, Uber Eats, Grubhub.
+- **Accessibility-first** — WCAG 2.1 AA compliant, keyboard navigation, screen reader support, reduced motion support.
 
 ## Demo Video
 
@@ -41,13 +47,14 @@ Open `architecture.html` in a browser to view the full interactive architecture 
 
 ### Data Flow
 
-1. **Input** - User uploads CSV or enters UPCs manually
-2. **Scraping** - Core sources and top-weighted registry sources queried concurrently with rotating user-agents, retry logic, and circuit breakers
-3. **Reasoning** - ProductReasoningAgent weights sources, deduplicates names, resolves fields, merges attributes
-4. **Image Verification** - Candidate photos are scored for white/clean backgrounds, quality, focus, sharpness, frame fill, source validity, and perceptual diversity; a ranked gallery of up to 5 verified multi-angle images is selected per product
-5. **Foundry IQ** - If Azure OpenAI credentials are configured, the agent sends raw data for LLM-based enrichment
-6. **Storage** - SQLite database tracks jobs and stores consolidated products
-7. **Output** - Live SSE updates to frontend, product cards with verified images/citations, multi-format export
+1. **Input** - User uploads a CSV or enters UPCs/SKUs manually
+2. **Scraping** - Core sources and top-weighted registry sources queried concurrently with rotating user-agents, retry logic, circuit breakers, and health tracking
+3. **Name-Based Image Search Fallback** - When no public UPC match exists, the system searches the web by product name/brand
+4. **Reasoning** - ProductReasoningAgent weights sources, deduplicates names, resolves fields, merges attributes, and generates citations
+5. **Image Verification** - Candidate photos are scored for white/clean backgrounds, quality, focus, sharpness, frame fill, source validity, and perceptual diversity; a ranked gallery of up to 5 verified multi-angle images is selected per product
+6. **Foundry IQ** - If Azure OpenAI credentials are configured, the agent sends raw data for LLM-based enrichment
+7. **Storage** - SQLite database tracks jobs and stores consolidated products
+8. **Output** - Live SSE updates to frontend, product cards with verified images/citations, manual upload/review, multi-format export
 
 ## Tech Stack
 
