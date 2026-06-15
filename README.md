@@ -130,7 +130,8 @@ GOOGLE_CX=your-programmable-search-engine-id
 | `/api/health` | GET | Health check with feature flags |
 | `/api/demo` | GET | Load 3 demo UPCs |
 | `/api/batch` | POST | Submit UPCs for processing |
-| `/api/upload-csv` | POST | Upload CSV with 'upc' column |
+| `/api/upload-csv` | POST | Upload POS CSV; auto-detects UPC/EAN/SKU/PLU, accepts `max_rows` query param |
+| `/api/upload-csv/preview` | POST | Preview a POS CSV: detected columns and sample UPCs |
 | `/api/products` | GET | List all products |
 | `/api/products/{upc}` | GET | Get single product |
 | `/api/export` | POST | Export as csv/json/shopify/amazon |

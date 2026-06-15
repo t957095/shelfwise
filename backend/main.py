@@ -22,7 +22,7 @@ import json
 import logging
 import time
 from contextlib import asynccontextmanager
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import httpx
 from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Query, UploadFile
@@ -31,6 +31,7 @@ from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.cache import upc_cache
+from backend.csv_parser import parse_pos_csv, preview_pos_csv
 from backend.database import (
     create_job,
     delete_all_products,
@@ -113,10 +114,39 @@ def get_scraper() -> UPCScraper:
     return scraper
 
 
+def _merge_seed_data(consolidated: Dict[str, Any], seed: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Merge CSV seed data into a consolidated product as fallback/enrichment.
+
+    Seed values are used when the scraper returns empty or low-confidence fields,
+    and price is always added as an attribute when present.
+    """
+    if not seed:
+        return consolidated
+
+    # Prefer scraper data, fall back to seed for core fields
+    for field in ("name", "brand", "category", "description"):
+        if seed.get(field) and not consolidated.get(field):
+            consolidated[field] = seed[field]
+
+    # Price always goes into attributes if present
+    if "price" in seed:
+        consolidated.setdefault("attributes", {})["pos_price"] = seed["price"]
+
+    # Public image URLs from seed become candidates for the verifier
+    if seed.get("image_urls"):
+        existing = {img.get("url") for img in consolidated.get("images", [])}
+        for url in seed["image_urls"]:
+            if url and url not in existing:
+                consolidated.setdefault("images", []).append({"url": url, "source": "POS Upload", "score": 0.5})
+                existing.add(url)
+
+    return consolidated
+
+
 # ---------------------------------------------------------------------------
 # Background task: process a single UPC
 # ---------------------------------------------------------------------------
-async def process_upc(upc: str, job_id: str):
+async def process_upc(upc: str, job_id: str, seed_data: Optional[Dict[str, Any]] = None):
     try:
         update_job(job_id, "queued", -1)
         update_job(job_id, "running", 1)
@@ -139,6 +169,7 @@ async def process_upc(upc: str, job_id: str):
         logger.info(f"UPC {upc}: scraped {len(raw_data_list)} sources in {scrape_elapsed:.2f}s")
 
         consolidated_dict = await agent.consolidate(upc, raw_data_list)
+        consolidated_dict = _merge_seed_data(consolidated_dict, seed_data)
         logger.info(f"UPC {upc}: consolidated with confidence {consolidated_dict.get('confidence', 0)}")
 
         product = ConsolidatedProduct(**consolidated_dict)
@@ -403,30 +434,55 @@ async def batch(request: UPCBatchRequest, background_tasks: BackgroundTasks):
     return {"message": f"Processing {len(upcs)} UPCs", "job_id": job_id, "total": len(upcs)}
 
 
-@app.post("/api/upload-csv")
-async def upload_csv(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
-    if not file.filename.endswith(".csv"):
+@app.post("/api/upload-csv/preview")
+async def upload_csv_preview(file: UploadFile = File(...), max_rows: int = Query(5, ge=1, le=20)):
+    """Preview a POS CSV: show detected columns and first few UPCs."""
+    if not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="File must be a CSV")
     try:
         content = await file.read()
-        text = content.decode("utf-8")
-        reader = csv.DictReader(io.StringIO(text))
-        if "upc" not in reader.fieldnames:
-            raise HTTPException(status_code=400, detail="CSV must have a column named 'upc'")
-        upcs = [row["upc"].strip() for row in reader if row["upc"].strip()]
+        preview = preview_pos_csv(content, max_rows=max_rows)
+        return preview
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error previewing CSV: {str(e)}")
+
+
+@app.post("/api/upload-csv")
+async def upload_csv(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    max_rows: int = Query(100, ge=1, le=5000),
+):
+    """Upload a POS CSV export and enqueue UPCs for enrichment.
+
+    Auto-detects UPC/EAN/SKU/PLU columns, handles quoted fields and mixed
+    encodings, and accepts seed data (name, brand, category, price, public
+    image URLs) to bootstrap the reasoning agent.
+    """
+    if not file.filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="File must be a CSV")
+    try:
+        content = await file.read()
+        upcs, seeds, columns, truncated = parse_pos_csv(content, max_rows=max_rows)
         if not upcs:
-            raise HTTPException(status_code=400, detail="No UPCs found in CSV")
+            raise HTTPException(status_code=400, detail="No valid UPCs found in CSV")
         job_id = create_job(upcs)
-        for upc in upcs:
-            background_tasks.add_task(process_upc, upc, job_id)
+        for upc, seed in zip(upcs, seeds):
+            background_tasks.add_task(process_upc, upc, job_id, seed)
         return {
             "message": f"Processing {len(upcs)} UPCs from CSV",
             "job_id": job_id,
             "total": len(upcs),
             "filename": file.filename,
+            "detected_columns": columns,
+            "truncated": truncated,
         }
     except HTTPException:
         raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing CSV: {str(e)}")
 
