@@ -50,6 +50,12 @@ shelfwise.db
 # Logs
 *.log
 
+# Demo video artifacts
+*.mp4
+*_filter.txt
+concat_list.txt
+arial.ttf
+
 # OS
 .DS_Store
 Thumbs.db
@@ -65,3 +71,6 @@ htmlcov/
 
 # Misc
 node_modules/
+
+# Uploaded product images
+backend/uploads/

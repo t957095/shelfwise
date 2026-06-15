@@ -7,18 +7,19 @@ Microsoft Azure AI Foundry SDK integration with tiered fallback:
   4. Local deterministic simulation — final fallback
 """
 
-import os
 import asyncio
-import re
+import hashlib
 import json
 import logging
-import hashlib
-from typing import List, Dict, Optional, Tuple, Any
+import os
+import re
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 # Ensure .env is loaded before reading env vars
 try:
     from dotenv import load_dotenv
+
     _env_path = Path(__file__).resolve().parent.parent / ".env"
     if _env_path.exists():
         load_dotenv(_env_path)
@@ -27,7 +28,6 @@ except Exception:
 
 # Optional Foundry IQ knowledge graph fallback
 try:
-    from backend.foundry_iq import FoundryIQService, ProductKnowledgeGraph
     _FOUNDRY_IQ_AVAILABLE = True
 except Exception:
     _FOUNDRY_IQ_AVAILABLE = False
@@ -39,6 +39,7 @@ try:
     from azure.ai.inference import ChatCompletionsClient
     from azure.ai.inference.models import SystemMessage, UserMessage
     from azure.core.credentials import AzureKeyCredential
+
     _AZURE_INFERENCE_AVAILABLE = True
 except Exception:
     _AZURE_INFERENCE_AVAILABLE = False
@@ -46,6 +47,7 @@ except Exception:
 try:
     from azure.ai.projects import AIProjectClient
     from azure.identity import DefaultAzureCredential
+
     _AZURE_PROJECTS_AVAILABLE = True
 except Exception:
     _AZURE_PROJECTS_AVAILABLE = False
@@ -53,9 +55,12 @@ except Exception:
 # OpenAI SDK for Ollama / GitHub Models compatible endpoints
 try:
     from openai import AsyncOpenAI
+
     _OPENAI_AVAILABLE = True
 except Exception:
     _OPENAI_AVAILABLE = False
+
+from backend.image_verifier import select_verified_images
 
 SOURCE_WEIGHTS = {
     "Open Food Facts": 0.90,
@@ -72,6 +77,22 @@ SOURCE_WEIGHTS = {
 
 STOPWORDS = {"the", "a", "an", "and", "or", "of", "in", "on", "at", "to", "for", "with", "by"}
 
+# Common category normalization map (source label → canonical marketplace category)
+CATEGORY_ALIASES = {
+    "sodas": "Beverages",
+    "colas": "Beverages",
+    "soft drinks": "Beverages",
+    "carbonated drinks": "Beverages",
+    "candy & chocolate": "Candy & Chocolate",
+    "chocolates": "Candy & Chocolate",
+    "confectionery": "Candy & Chocolate",
+    "snacks": "Snacks",
+    "chips": "Snacks",
+    "crackers": "Snacks",
+    "cookies": "Cookies & Biscuits",
+    "biscuits": "Cookies & Biscuits",
+}
+
 
 def _canonicalize(text: str) -> str:
     if not text:
@@ -79,6 +100,25 @@ def _canonicalize(text: str) -> str:
     cleaned = re.sub(r"[^\w\s]", " ", text.lower())
     words = [w for w in cleaned.split() if w not in STOPWORDS and len(w) > 1]
     return " ".join(sorted(words))
+
+
+def _normalize_key(key: str) -> str:
+    """Normalize attribute keys to snake_case conventions."""
+    if not key:
+        return key
+    key = str(key).strip().lower()
+    key = re.sub(r"[^\w\s]", " ", key)
+    key = re.sub(r"\s+", "_", key)
+    return key[:64]
+
+
+def _normalize_category(category: Optional[str]) -> Optional[str]:
+    """Map noisy category strings to canonical marketplace categories."""
+    if not category:
+        return None
+    cat = str(category).strip()
+    key = cat.lower()
+    return CATEGORY_ALIASES.get(key, cat)
 
 
 def _jaccard_similarity(a: str, b: str) -> float:
@@ -113,7 +153,12 @@ class ProductReasoningAgent:
 
         # --- Tier 1: Azure AI Inference SDK ---
         # Primary: Azure AI Inference endpoints (GitHub Models, Azure OpenAI, etc.)
-        if _AZURE_INFERENCE_AVAILABLE and endpoint and api_key and ("azure.com" in endpoint or "inference.ai" in endpoint):
+        if (
+            _AZURE_INFERENCE_AVAILABLE
+            and endpoint
+            and api_key
+            and ("azure.com" in endpoint or "inference.ai" in endpoint)
+        ):
             try:
                 model = os.environ.get("FOUNDRY_MODEL", "gpt-4o")
                 self._azure_client = ChatCompletionsClient(
@@ -161,10 +206,7 @@ class ProductReasoningAgent:
 
         # Step 1: Weight and filter sources
         weighted = self._weight_sources(raw_data_list)
-        trace.append(
-            f"Weighted {len(weighted)} sources: "
-            + ", ".join(f"{s['source']}({w:.2f})" for s, w in weighted)
-        )
+        trace.append(f"Weighted {len(weighted)} sources: " + ", ".join(f"{s['source']}({w:.2f})" for s, w in weighted))
 
         # Step 2: Resolve fields
         name, name_sources = self._resolve_name(weighted)
@@ -174,6 +216,7 @@ class ProductReasoningAgent:
         trace.append(f"Resolved brand: '{brand}' from {brand_sources}")
 
         category, category_sources = self._resolve_category(weighted)
+        category = _normalize_category(category)
         trace.append(f"Resolved category: '{category}' from {category_sources}")
 
         # Step 3: Merge attributes
@@ -186,17 +229,24 @@ class ProductReasoningAgent:
         trace.append(f"Generated description ({len(description)} chars)")
 
         # Step 5: Select images
-        images, best_image_url = self._select_images(weighted)
+        images, best_image_url = await self._select_images(upc, weighted, name, brand)
         trace.append(f"Selected {len(images)} images, best: {best_image_url is not None}")
 
         # Step 6: Compute confidence
         resolved_count = sum(1 for x in [name, brand, category] if x)
-        confidence = self._compute_confidence(weighted, resolved_count, name_sources)
+        confidence = self._compute_confidence(weighted, resolved_count, name_sources, brand_sources, category_sources)
         trace.append(f"Computed confidence: {confidence:.2f}")
 
         # Step 7: Generate citations
         citations = self._foundry_iq_ground(
-            {"name": name, "brand": brand, "category": category, "description": description, "images": images, "attributes": attributes},
+            {
+                "name": name,
+                "brand": brand,
+                "category": category,
+                "description": description,
+                "images": images,
+                "attributes": attributes,
+            },
             weighted,
         )
         trace.append(f"Generated {len(citations)} citations")
@@ -238,11 +288,18 @@ class ProductReasoningAgent:
                     trace.append("Foundry enriched fields merged")
 
         return {
-            "upc": upc, "name": name, "brand": brand, "category": category,
-            "description": description, "image_url": best_image_url,
-            "images": images, "attributes": attributes,
-            "confidence": round(confidence, 3), "status": status,
-            "citations": citations, "reasoning_trace": trace,
+            "upc": upc,
+            "name": name,
+            "brand": brand,
+            "category": category,
+            "description": description,
+            "image_url": best_image_url,
+            "images": images,
+            "attributes": attributes,
+            "confidence": round(confidence, 3),
+            "status": status,
+            "citations": citations,
+            "reasoning_trace": trace,
             "foundry_enriched": bool(foundry_result and foundry_result.get("data")),
             "foundry_sdk": (foundry_result.get("sdk") if foundry_result else None),
         }
@@ -251,9 +308,13 @@ class ProductReasoningAgent:
     # Microsoft Foundry SDK Integration
     # -----------------------------------------------------------------------
     async def _foundry_reasoning_call(
-        self, upc: str, raw_data_list: List[Dict[str, Any]],
-        current_name: str, current_brand: Optional[str],
-        current_category: Optional[str], current_description: str
+        self,
+        upc: str,
+        raw_data_list: List[Dict[str, Any]],
+        current_name: str,
+        current_brand: Optional[str],
+        current_category: Optional[str],
+        current_description: str,
     ) -> Optional[Dict[str, Any]]:
         """
         Tiered Microsoft Foundry integration:
@@ -265,7 +326,9 @@ class ProductReasoningAgent:
         model = os.environ.get("FOUNDRY_MODEL", "gpt-4o-mini")
 
         # Build structured prompt
-        prompt = self._build_llm_prompt(upc, raw_data_list, current_name, current_brand, current_category, current_description)
+        prompt = self._build_llm_prompt(
+            upc, raw_data_list, current_name, current_brand, current_category, current_description
+        )
 
         # --- Tier 1: Azure AI Inference SDK ---
         if self._azure_client and _AZURE_INFERENCE_AVAILABLE:
@@ -307,8 +370,7 @@ class ProductReasoningAgent:
         return None
 
     async def _foundry_iq_fallback(
-        self, upc: str, current_name: str, current_brand: Optional[str],
-        current_category: Optional[str]
+        self, upc: str, current_name: str, current_brand: Optional[str], current_category: Optional[str]
     ) -> Optional[Dict[str, Any]]:
         """Use the local Foundry IQ knowledge graph to enrich product data.
 
@@ -371,8 +433,13 @@ class ProductReasoningAgent:
         }
 
     def _build_llm_prompt(
-        self, upc: str, raw_data_list: List[Dict[str, Any]],
-        name: str, brand: Optional[str], category: Optional[str], description: str
+        self,
+        upc: str,
+        raw_data_list: List[Dict[str, Any]],
+        name: str,
+        brand: Optional[str],
+        category: Optional[str],
+        description: str,
     ) -> str:
         """Build a structured prompt for LLM enrichment."""
         sources_text = json.dumps(raw_data_list, indent=2, default=str)[:4000]
@@ -450,6 +517,7 @@ Rules:
                 assistant_id=agent.id,
             )
             import time
+
             for _ in range(30):
                 run = self._azure_projects_client.agents.get_run(thread_id=thread.id, run_id=run.id)
                 if run.status in ("completed", "failed", "cancelled"):
@@ -553,11 +621,31 @@ Rules:
         return best_name, list(dict.fromkeys(sources_used))
 
     def _resolve_brand(self, weighted_sources: List[Tuple[Dict, float]]) -> Tuple[Optional[str], List[str]]:
+        """Resolve brand by weighted voting; prefer the highest-weight brand that has agreement."""
+        brand_votes: Dict[str, float] = {}
+        brand_sources: Dict[str, List[str]] = {}
         for data, weight in weighted_sources:
             brand = data.get("brand")
             if brand and len(str(brand).strip()) > 0:
-                return str(brand).strip(), [data.get("source", "Unknown")]
-        return None, []
+                brand_clean = str(brand).strip()
+                key = brand_clean.lower()
+                brand_votes[key] = brand_votes.get(key, 0.0) + weight
+                brand_sources.setdefault(key, []).append(data.get("source", "Unknown"))
+
+        if not brand_votes:
+            return None, []
+
+        # Pick the brand with the highest total weight, preserving original casing
+        best_key = max(brand_votes, key=brand_votes.get)
+        # Map normalized key back to the most common original casing
+        original_votes: Dict[str, float] = {}
+        for data, weight in weighted_sources:
+            brand = data.get("brand")
+            if brand and str(brand).strip().lower() == best_key:
+                original = str(brand).strip()
+                original_votes[original] = original_votes.get(original, 0.0) + weight
+        best_original = max(original_votes, key=original_votes.get)
+        return best_original, list(dict.fromkeys(brand_sources[best_key]))
 
     def _resolve_category(self, weighted_sources: List[Tuple[Dict, float]]) -> Tuple[Optional[str], List[str]]:
         for data, weight in weighted_sources:
@@ -613,29 +701,65 @@ Rules:
 
         return f"Product information for UPC {fields.get('upc', 'unknown')}"
 
-    def _select_images(self, weighted_sources: List[Tuple[Dict, float]]) -> Tuple[List[Dict], Optional[str]]:
+    async def _select_images(
+        self,
+        upc: str,
+        weighted_sources: List[Tuple[Dict, float]],
+        name: str,
+        brand: Optional[str],
+    ) -> Tuple[List[Dict], Optional[str]]:
         seen_urls = set()
-        images = []
+        candidates = []
         for data, weight in weighted_sources:
             for url in data.get("image_urls", []):
                 if url and url not in seen_urls:
                     seen_urls.add(url)
-                    images.append({"url": url, "source": data.get("source", "Unknown"), "score": round(weight, 3)})
-        images.sort(key=lambda x: x["score"], reverse=True)
-        best_url = images[0]["url"] if images else None
-        return images, best_url
+                    candidates.append({"url": url, "source": data.get("source", "Unknown"), "score": round(weight, 3)})
+
+        if not candidates:
+            return [], None
+
+        # Run deterministic verification pipeline and return a ranked gallery of
+        # verified, marketplace-ready photos. Deduplication with perceptual
+        # hashing keeps multi-angle shots while removing near-duplicates.
+        try:
+            verified_images, best_url = await select_verified_images(
+                candidates=candidates,
+                product_name=name,
+                product_brand=brand,
+                max_images=5,
+            )
+            if verified_images:
+                return verified_images, best_url
+        except Exception as e:
+            logger = logging.getLogger("shelfwise")
+            logger.warning(f"UPC {upc}: image verification failed ({e}); falling back to source-weighted ranking")
+
+        # Fallback: use the highest source-weighted candidate raw
+        candidates.sort(key=lambda x: x["score"], reverse=True)
+        return candidates[:5], candidates[0]["url"] if candidates else None
 
     def _merge_attributes(self, weighted_sources: List[Tuple[Dict, float]]) -> Dict[str, Any]:
-        merged = {}
+        merged: Dict[str, Any] = {}
+        # Merge in reverse weight order so higher-weight sources win on conflict
         for data, weight in reversed(weighted_sources):
             attrs = data.get("attributes", {})
             if isinstance(attrs, dict):
                 for key, value in attrs.items():
                     if value is not None and str(value).strip():
-                        merged[key] = value
+                        normalized_key = _normalize_key(key)
+                        if normalized_key not in merged:
+                            merged[normalized_key] = value
         return merged
 
-    def _compute_confidence(self, weighted_sources: List[Tuple[Dict, float]], resolved_fields_count: int, name_sources: List[str]) -> float:
+    def _compute_confidence(
+        self,
+        weighted_sources: List[Tuple[Dict, float]],
+        resolved_fields_count: int,
+        name_sources: List[str],
+        brand_sources: List[str],
+        category_sources: List[str],
+    ) -> float:
         if not weighted_sources:
             return 0.0
 
@@ -645,15 +769,17 @@ Rules:
 
         num_sources = len(weighted_sources)
         if num_sources > 1:
-            confidence += min(0.1 * (num_sources - 1), 0.3)
+            confidence += min(0.08 * (num_sources - 1), 0.24)
         else:
             confidence -= 0.2
 
         confidence += min(0.05 * resolved_fields_count, 0.15)
 
-        unique_agreeing = len(set(name_sources))
-        if unique_agreeing > 1:
-            confidence += min(0.05 * (unique_agreeing - 1), 0.15)
+        # Reward cross-source agreement on key fields
+        for sources in (name_sources, brand_sources, category_sources):
+            unique_agreeing = len(set(sources))
+            if unique_agreeing > 1:
+                confidence += min(0.04 * (unique_agreeing - 1), 0.12)
 
         return max(0.0, min(1.0, confidence))
 
@@ -683,11 +809,13 @@ Rules:
             if elapsed is not None:
                 note += f" ({elapsed}ms)"
 
-            citations.append({
-                "source": source_name,
-                "source_url": source_url,
-                "fields": fields,
-                "confidence": round(weight, 3),
-                "note": note,
-            })
+            citations.append(
+                {
+                    "source": source_name,
+                    "source_url": source_url,
+                    "fields": fields,
+                    "confidence": round(weight, 3),
+                    "note": note,
+                }
+            )
         return citations

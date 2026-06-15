@@ -8,15 +8,13 @@ Features:
 - Query timing and metrics hooks
 """
 
-import sqlite3
 import json
 import os
-import uuid
+import sqlite3
 import threading
-import time
+import uuid
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
-from contextlib import contextmanager
+from typing import Any, Dict, List, Optional
 
 from backend.models import ConsolidatedProduct
 
@@ -39,13 +37,43 @@ def _get_connection() -> sqlite3.Connection:
     return _db_local.conn
 
 
+def _table_has_columns(conn: sqlite3.Connection, table: str, required: List[str]) -> bool:
+    """Check whether table exists with all required columns."""
+    try:
+        rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+    except Exception:
+        return False
+    existing = {r[1] for r in rows}
+    return all(col in existing for col in required)
+
+
+def _reset_schema(conn: sqlite3.Connection):
+    """Drop existing tables so the canonical schema can be created."""
+    conn.execute("DROP TABLE IF EXISTS products")
+    conn.execute("DROP TABLE IF EXISTS jobs")
+    conn.execute("DROP INDEX IF EXISTS idx_products_name")
+    conn.execute("DROP INDEX IF EXISTS idx_products_brand")
+    conn.execute("DROP INDEX IF EXISTS idx_products_category")
+    conn.execute("DROP INDEX IF EXISTS idx_products_confidence")
+    conn.execute("DROP INDEX IF EXISTS idx_products_status")
+    conn.execute("DROP INDEX IF EXISTS idx_jobs_status")
+
+
 def init_db():
-    """Create tables and indexes if they don't exist."""
+    """Create tables and indexes. Resets incompatible legacy schemas."""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     try:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA synchronous=NORMAL")
+
+        products_required = {"upc", "name", "brand", "category", "confidence", "status", "data"}
+        jobs_required = {"job_id", "total", "queued", "running", "completed", "failed"}
+
+        if not _table_has_columns(conn, "products", products_required) or not _table_has_columns(
+            conn, "jobs", jobs_required
+        ):
+            _reset_schema(conn)
 
         # Products table with optimized schema
         conn.execute(
@@ -67,14 +95,17 @@ def init_db():
         )
 
         # Migrate existing tables if they don't have the new columns
-        try:
-            conn.execute("ALTER TABLE products ADD COLUMN foundry_enriched INTEGER DEFAULT 0")
-        except Exception:
-            pass
-        try:
-            conn.execute("ALTER TABLE products ADD COLUMN foundry_sdk TEXT")
-        except Exception:
-            pass
+        migrations = [
+            "ALTER TABLE products ADD COLUMN confidence REAL",
+            "ALTER TABLE products ADD COLUMN status TEXT",
+            "ALTER TABLE products ADD COLUMN foundry_enriched INTEGER DEFAULT 0",
+            "ALTER TABLE products ADD COLUMN foundry_sdk TEXT",
+        ]
+        for sql in migrations:
+            try:
+                conn.execute(sql)
+            except Exception:
+                pass
 
         # Jobs table
         conn.execute(
@@ -231,11 +262,51 @@ def get_product(upc: str) -> Optional[Dict[str, Any]]:
     return dict(row) if row else None
 
 
-def get_all_products() -> List[Dict[str, Any]]:
-    """Return all products."""
+def get_all_products(limit: Optional[int] = None, offset: int = 0) -> List[Dict[str, Any]]:
+    """Return products newest first, optionally paginated."""
     conn = _get_connection()
-    rows = conn.execute("SELECT * FROM products ORDER BY created_at DESC").fetchall()
+    if limit is None:
+        rows = conn.execute("SELECT * FROM products ORDER BY created_at DESC").fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM products ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            (limit, offset),
+        ).fetchall()
     return [dict(row) for row in rows]
+
+
+def count_products(
+    query: Optional[str] = None,
+    brand: Optional[str] = None,
+    category: Optional[str] = None,
+    status: Optional[str] = None,
+    min_confidence: Optional[float] = None,
+) -> int:
+    """Count products matching the same filters as search_products."""
+    conn = _get_connection()
+    conditions = []
+    params = []
+
+    if query:
+        conditions.append("(name LIKE ? OR upc LIKE ? OR brand LIKE ? OR category LIKE ? OR data LIKE ?)")
+        like = f"%{query}%"
+        params.extend([like, like, like, like, like])
+    if brand:
+        conditions.append("brand = ?")
+        params.append(brand)
+    if category:
+        conditions.append("category = ?")
+        params.append(category)
+    if status:
+        conditions.append("status = ?")
+        params.append(status)
+    if min_confidence is not None:
+        conditions.append("confidence >= ?")
+        params.append(min_confidence)
+
+    where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
+    row = conn.execute(f"SELECT COUNT(*) FROM products {where_clause}", params).fetchone()
+    return int(row[0] if row else 0)
 
 
 def search_products(
@@ -253,9 +324,9 @@ def search_products(
     params = []
 
     if query:
-        conditions.append("(name LIKE ? OR upc LIKE ?)")
+        conditions.append("(name LIKE ? OR upc LIKE ? OR brand LIKE ? OR category LIKE ? OR data LIKE ?)")
         like = f"%{query}%"
-        params.extend([like, like])
+        params.extend([like, like, like, like, like])
     if brand:
         conditions.append("brand = ?")
         params.append(brand)
@@ -291,16 +362,41 @@ def get_stats() -> Dict[str, Any]:
     conn = _get_connection()
     total = conn.execute("SELECT COUNT(*) FROM products").fetchone()[0]
     avg_conf = conn.execute("SELECT AVG(confidence) FROM products").fetchone()[0] or 0.0
-    status_counts = conn.execute(
-        "SELECT status, COUNT(*) FROM products GROUP BY status"
-    ).fetchall()
+    status_counts = conn.execute("SELECT status, COUNT(*) FROM products GROUP BY status").fetchall()
     category_counts = conn.execute(
         "SELECT category, COUNT(*) FROM products WHERE category IS NOT NULL GROUP BY category"
     ).fetchall()
+    confidence_counts = conn.execute(
+        """
+        SELECT
+            SUM(CASE WHEN confidence >= 0.7 THEN 1 ELSE 0 END) AS high,
+            SUM(CASE WHEN confidence >= 0.4 AND confidence < 0.7 THEN 1 ELSE 0 END) AS medium,
+            SUM(CASE WHEN confidence < 0.4 OR confidence IS NULL THEN 1 ELSE 0 END) AS low
+        FROM products
+        """
+    ).fetchone()
+
+    source_coverage: Dict[str, int] = {}
+    rows = conn.execute("SELECT data FROM products").fetchall()
+    for row in rows:
+        try:
+            product = json.loads(row["data"])
+        except (json.JSONDecodeError, TypeError, KeyError):
+            continue
+        for citation in product.get("citations", []) or []:
+            source = citation.get("source") if isinstance(citation, dict) else None
+            if source:
+                source_coverage[source] = source_coverage.get(source, 0) + 1
 
     return {
         "total_products": total,
         "avg_confidence": round(avg_conf, 3),
         "status_breakdown": {row[0]: row[1] for row in status_counts},
         "category_breakdown": {row[0] or "Uncategorized": row[1] for row in category_counts},
+        "confidence_distribution": {
+            "high": int(confidence_counts["high"] or 0),
+            "medium": int(confidence_counts["medium"] or 0),
+            "low": int(confidence_counts["low"] or 0),
+        },
+        "source_coverage": source_coverage,
     }

@@ -8,24 +8,26 @@ When AZURE_FOUNDRY_ENDPOINT is set, this module proxies to the real service.
 Otherwise, it runs a local knowledge graph + semantic retrieval engine.
 """
 
-import os
-import json
-import re
-import math
-from typing import Dict, List, Optional, Any, Callable
-from dataclasses import dataclass, field, asdict
-from datetime import datetime, timedelta
-from collections import defaultdict
-import sqlite3
 import hashlib
+import json
+import math
+import os
+import re
+import sqlite3
+from collections import defaultdict
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 # ---------------------------------------------------------------------------
 # Data models
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class KnowledgeNode:
     """A node in the product knowledge graph."""
+
     id: str
     entity_type: str  # product, brand, category, attribute, attribute_value
     label: str
@@ -49,6 +51,7 @@ class KnowledgeNode:
 @dataclass
 class KnowledgeEdge:
     """A relationship between two knowledge nodes."""
+
     source_id: str
     target_id: str
     relation: str
@@ -68,6 +71,7 @@ class KnowledgeEdge:
 @dataclass
 class GroundedAnswer:
     """A Foundry IQ-style grounded answer with citations."""
+
     answer: str
     citations: List[Dict[str, Any]]
     confidence: float
@@ -87,6 +91,7 @@ class GroundedAnswer:
 # ---------------------------------------------------------------------------
 # Local Knowledge Graph
 # ---------------------------------------------------------------------------
+
 
 class ProductKnowledgeGraph:
     """In-memory knowledge graph built from scraped product data.
@@ -126,7 +131,9 @@ class ProductKnowledgeGraph:
     def get_node(self, node_id: str) -> Optional[KnowledgeNode]:
         return self.nodes.get(node_id)
 
-    def find_nodes(self, entity_type: Optional[str] = None, label_contains: Optional[str] = None) -> List[KnowledgeNode]:
+    def find_nodes(
+        self, entity_type: Optional[str] = None, label_contains: Optional[str] = None
+    ) -> List[KnowledgeNode]:
         results = []
         for node in self.nodes.values():
             if entity_type and node.entity_type != entity_type:
@@ -161,10 +168,9 @@ class ProductKnowledgeGraph:
             {
                 "node": self.nodes[node_id].to_dict(),
                 "score": round(score, 4),
-                "related_edges": [
-                    e.to_dict() for e in self.edges
-                    if e.source_id == node_id or e.target_id == node_id
-                ][:5],
+                "related_edges": [e.to_dict() for e in self.edges if e.source_id == node_id or e.target_id == node_id][
+                    :5
+                ],
             }
             for node_id, score in ranked
         ]
@@ -223,12 +229,14 @@ class ProductKnowledgeGraph:
                 confidence=product.get("confidence", 1.0),
             )
             self.add_node(brand_node)
-            self.add_edge(KnowledgeEdge(
-                source_id=product_id,
-                target_id=brand_id,
-                relation="manufactured_by",
-                confidence=product.get("confidence", 1.0),
-            ))
+            self.add_edge(
+                KnowledgeEdge(
+                    source_id=product_id,
+                    target_id=brand_id,
+                    relation="manufactured_by",
+                    confidence=product.get("confidence", 1.0),
+                )
+            )
 
         # Category node
         if category:
@@ -241,12 +249,14 @@ class ProductKnowledgeGraph:
                 confidence=product.get("confidence", 1.0),
             )
             self.add_node(cat_node)
-            self.add_edge(KnowledgeEdge(
-                source_id=product_id,
-                target_id=cat_id,
-                relation="belongs_to",
-                confidence=product.get("confidence", 1.0),
-            ))
+            self.add_edge(
+                KnowledgeEdge(
+                    source_id=product_id,
+                    target_id=cat_id,
+                    relation="belongs_to",
+                    confidence=product.get("confidence", 1.0),
+                )
+            )
 
         # Attribute nodes
         for attr_key, attr_val in product.get("attributes", {}).items():
@@ -260,12 +270,14 @@ class ProductKnowledgeGraph:
                     confidence=product.get("confidence", 1.0),
                 )
                 self.add_node(attr_node)
-                self.add_edge(KnowledgeEdge(
-                    source_id=product_id,
-                    target_id=attr_id,
-                    relation=f"has_{attr_key}",
-                    confidence=product.get("confidence", 1.0),
-                ))
+                self.add_edge(
+                    KnowledgeEdge(
+                        source_id=product_id,
+                        target_id=attr_id,
+                        relation=f"has_{attr_key}",
+                        confidence=product.get("confidence", 1.0),
+                    )
+                )
 
     def to_dict(self) -> Dict:
         return {
@@ -282,6 +294,7 @@ class ProductKnowledgeGraph:
 # ---------------------------------------------------------------------------
 # Foundry IQ Service
 # ---------------------------------------------------------------------------
+
 
 class FoundryIQService:
     """Local simulation of Microsoft Foundry IQ.
@@ -317,7 +330,9 @@ class FoundryIQService:
             conn = sqlite3.connect(self.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute("SELECT upc, name, brand, category, confidence, status, foundry_enriched, foundry_sdk, data FROM products")
+            cursor.execute(
+                "SELECT upc, name, brand, category, confidence, status, foundry_enriched, foundry_sdk, data FROM products"
+            )
             rows = cursor.fetchall()
             for row in rows:
                 row_dict = dict(row)
@@ -398,23 +413,25 @@ class FoundryIQService:
                 if entity_type == "product":
                     desc = props.get("description", "")
                     upc = props.get("upc", "")
-                    parts.append(f"{i+1}. {label} (UPC: {upc}): {desc[:120]}{'...' if len(desc) > 120 else ''}")
+                    parts.append(f"{i + 1}. {label} (UPC: {upc}): {desc[:120]}{'...' if len(desc) > 120 else ''}")
                 elif entity_type == "brand":
-                    parts.append(f"{i+1}. Brand: {label}")
+                    parts.append(f"{i + 1}. Brand: {label}")
                 elif entity_type == "category":
-                    parts.append(f"{i+1}. Category: {label}")
+                    parts.append(f"{i + 1}. Category: {label}")
                 else:
-                    parts.append(f"{i+1}. {label}")
+                    parts.append(f"{i + 1}. {label}")
 
-                citations.append({
-                    "index": i + 1,
-                    "source_id": node["id"],
-                    "source_type": entity_type,
-                    "label": label,
-                    "retrieval_score": round(score, 4),
-                    "confidence": node.get("confidence", 1.0),
-                    "data_sources": node.get("sources", []),
-                })
+                citations.append(
+                    {
+                        "index": i + 1,
+                        "source_id": node["id"],
+                        "source_type": entity_type,
+                        "label": label,
+                        "retrieval_score": round(score, 4),
+                        "confidence": node.get("confidence", 1.0),
+                        "data_sources": node.get("sources", []),
+                    }
+                )
                 sources.extend(node.get("sources", []))
 
             answer = f"Found {len(filtered_results)} relevant knowledge items for '{query}':\n\n" + "\n".join(parts)
@@ -428,13 +445,15 @@ class FoundryIQService:
             query_id=query_id,
         )
 
-        self._query_history.append({
-            "query": query,
-            "query_id": query_id,
-            "role": role,
-            "timestamp": datetime.utcnow().isoformat(),
-            "result": result.to_dict(),
-        })
+        self._query_history.append(
+            {
+                "query": query,
+                "query_id": query_id,
+                "role": role,
+                "timestamp": datetime.utcnow().isoformat(),
+                "result": result.to_dict(),
+            }
+        )
 
         return result
 
@@ -506,7 +525,10 @@ class FoundryIQService:
         elif any(w in q_lower for w in ["attribute", "size", "flavor", "color", "spec"]):
             attr_rels = [r for r in related if r["edge"]["relation"].startswith("has_")]
             if attr_rels:
-                attrs = [f"{r['node']['properties'].get('key', '')}: {r['node']['properties'].get('value', '')}" for r in attr_rels]
+                attrs = [
+                    f"{r['node']['properties'].get('key', '')}: {r['node']['properties'].get('value', '')}"
+                    for r in attr_rels
+                ]
                 answer_parts.append(f"Product attributes: {', '.join(attrs)}.")
             else:
                 answer_parts.append("No attributes found in the knowledge base.")
@@ -542,15 +564,17 @@ class FoundryIQService:
         answer = " ".join(answer_parts) if answer_parts else "Unable to answer this question with available knowledge."
         query_id = self._generate_query_id(f"{upc}:{question}")
 
-        citations = [{
-            "index": 1,
-            "source_id": product_node.id,
-            "source_type": "product",
-            "label": product_node.label,
-            "retrieval_score": 1.0,
-            "confidence": product_node.confidence,
-            "data_sources": product_node.sources,
-        }]
+        citations = [
+            {
+                "index": 1,
+                "source_id": product_node.id,
+                "source_type": "product",
+                "label": product_node.label,
+                "retrieval_score": 1.0,
+                "confidence": product_node.confidence,
+                "data_sources": product_node.sources,
+            }
+        ]
 
         result = GroundedAnswer(
             answer=answer,
@@ -560,13 +584,15 @@ class FoundryIQService:
             query_id=query_id,
         )
 
-        self._query_history.append({
-            "query": f"{upc}: {question}",
-            "query_id": query_id,
-            "role": role,
-            "timestamp": datetime.utcnow().isoformat(),
-            "result": result.to_dict(),
-        })
+        self._query_history.append(
+            {
+                "query": f"{upc}: {question}",
+                "query_id": query_id,
+                "role": role,
+                "timestamp": datetime.utcnow().isoformat(),
+                "result": result.to_dict(),
+            }
+        )
 
         return result
 
@@ -578,10 +604,16 @@ class FoundryIQService:
 
         relations = defaultdict(list)
         for edge in self.knowledge_graph.edges:
-            relations[edge.relation].append({
-                "from": self.knowledge_graph.nodes.get(edge.source_id, KnowledgeNode(id="", entity_type="", label="")).label,
-                "to": self.knowledge_graph.nodes.get(edge.target_id, KnowledgeNode(id="", entity_type="", label="")).label,
-            })
+            relations[edge.relation].append(
+                {
+                    "from": self.knowledge_graph.nodes.get(
+                        edge.source_id, KnowledgeNode(id="", entity_type="", label="")
+                    ).label,
+                    "to": self.knowledge_graph.nodes.get(
+                        edge.target_id, KnowledgeNode(id="", entity_type="", label="")
+                    ).label,
+                }
+            )
 
         return {
             "ontology_name": "ShelfWise Product Ontology",
@@ -606,6 +638,7 @@ class FoundryIQService:
 
 # Singleton instance
 _foundry_iq_service: Optional[FoundryIQService] = None
+
 
 def get_foundry_iq_service(db_path: str = "shelfwise.db") -> FoundryIQService:
     global _foundry_iq_service

@@ -808,6 +808,159 @@ body {
     }
 }
 
+/* Product Image Gallery */
+.product-image-thumbnails {
+    display: flex;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--bg-tertiary);
+    border-top: 1px solid var(--border);
+    overflow-x: auto;
+}
+
+.product-thumbnail {
+    flex: 0 0 56px;
+    width: 56px;
+    height: 56px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-secondary);
+    cursor: zoom-in;
+    overflow: hidden;
+    transition: var(--transition);
+}
+
+.product-thumbnail:hover,
+.product-thumbnail:focus {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 2px var(--accent-glow);
+    outline: none;
+}
+
+.product-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Image Manager Modal */
+.image-manager-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    margin-bottom: 12px;
+}
+
+.image-manager-item img {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+    background: var(--bg-tertiary);
+}
+
+.image-manager-meta {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.image-manager-source {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+.image-manager-primary {
+    display: inline-block;
+    background: var(--accent-glow);
+    color: var(--accent-primary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    width: fit-content;
+}
+
+.image-manager-upload {
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+}
+
+.image-manager-upload label {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    margin-bottom: 8px;
+}
+
+.image-manager-upload input[type="file"] {
+    width: 100%;
+    padding: 12px;
+    background: var(--bg-tertiary);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+    color: var(--text-primary);
+}
+
+/* CSV Preview Panel */
+.csv-preview {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.csv-preview h4 {
+    margin: 0 0 8px 0;
+    color: var(--text-primary);
+}
+
+.csv-preview p {
+    margin: 0 0 12px 0;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.csv-preview ul {
+    margin: 0 0 16px 0;
+    padding-left: 20px;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.csv-preview li {
+    margin-bottom: 4px;
+}
+
+.csv-preview-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+}
+
+.csv-preview-actions label {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+.csv-preview-actions select {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    font-size: 0.875rem;
+}
+
 /* Lightbox */
 .lightbox {
     position: relative;

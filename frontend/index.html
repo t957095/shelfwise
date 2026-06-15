@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="ShelfWise - AI Product Portfolio Builder for Small Businesses. Transform UPC codes into complete e-commerce listings.">
+    <meta name="description" content="ShelfWise: Turn a spreadsheet of UPCs and SKUs into a complete, market-ready product catalog with verified photos, titles, and descriptions.">
     <meta name="theme-color" content="#0f0f23">
     <title>ShelfWise - AI Product Portfolio Builder</title>
     <link rel="preload" href="styles.css" as="style">
@@ -17,7 +17,7 @@
         <!-- Header -->
         <header class="app-header" role="banner">
             <h1>ShelfWise</h1>
-            <p class="subtitle">AI Product Portfolio Builder for Small Businesses</p>
+            <p class="subtitle">Turn a spreadsheet of UPCs and SKUs into a complete, market-ready product catalog</p>
             <span class="badge">Microsoft Foundry Powered</span>
         </header>
 
@@ -37,15 +37,37 @@
                     <span id="upc-help" style="display: block; color: var(--text-muted); font-size: 0.8rem; margin-top: 4px;">Enter one UPC code per line, or upload a CSV file below</span>
                 </div>
 
-                <div class="input-group">
-                    <label for="csv-file">Or Upload CSV (must have 'upc' column)</label>
+                <div class="input-group" id="drop-zone">
+                    <label for="csv-file">Or Upload POS CSV</label>
                     <input
                         type="file"
                         id="csv-file"
                         accept=".csv"
                         aria-describedby="csv-help"
                     >
-                    <span id="csv-help" style="display: block; color: var(--text-muted); font-size: 0.8rem; margin-top: 4px;">Drag and drop supported. CSV must contain a column named 'upc'.</span>
+                    <span id="csv-help" style="display: block; color: var(--text-muted); font-size: 0.8rem; margin-top: 4px;">Auto-detects UPC/EAN/SKU/PLU columns. Drag and drop supported.</span>
+                </div>
+
+                <div id="csv-preview" class="csv-preview" style="display: none;" aria-live="polite">
+                    <h4>CSV Preview</h4>
+                    <p id="csv-preview-summary"></p>
+                    <ul id="csv-preview-samples"></ul>
+                    <div class="csv-preview-actions">
+                        <label for="csv-max-rows">Process up to:</label>
+                        <select id="csv-max-rows" aria-label="Maximum rows to process">
+                            <option value="10" selected>10 rows (demo)</option>
+                            <option value="50">50 rows</option>
+                            <option value="100">100 rows</option>
+                            <option value="500">500 rows</option>
+                            <option value="1000">1,000 rows</option>
+                        </select>
+                        <button id="csv-preview-process" class="btn btn-primary" aria-label="Process previewed CSV">
+                            <span>🚀</span> Process CSV
+                        </button>
+                        <button id="csv-preview-cancel" class="btn btn-secondary" aria-label="Cancel CSV upload">
+                            Cancel
+                        </button>
+                    </div>
                 </div>
 
                 <div class="button-group">
@@ -122,8 +144,8 @@
                 </div>
             </section>
 
-            <section class="export-section" aria-labelledby="export-heading">
-                <h3 id="export-heading">Portfolio Analytics</h3>
+            <section class="export-section" aria-labelledby="analytics-heading">
+                <h3 id="analytics-heading">Portfolio Analytics</h3>
                 <div class="status-grid" id="stats-grid" style="margin-bottom: 16px;">
                     <div class="status-item">
                         <span class="status-label">Products</span>
@@ -194,6 +216,21 @@
                         <span class="label">BigCommerce</span>
                         <span class="hint">Enterprise store</span>
                     </button>
+                    <button class="export-btn" id="export-doordash-btn" aria-label="Export as DoorDash CSV">
+                        <span class="icon">🚪</span>
+                        <span class="label">DoorDash</span>
+                        <span class="hint">Menu import</span>
+                    </button>
+                    <button class="export-btn" id="export-ubereats-btn" aria-label="Export as Uber Eats CSV">
+                        <span class="icon">🚗</span>
+                        <span class="label">Uber Eats</span>
+                        <span class="hint">Menu import</span>
+                    </button>
+                    <button class="export-btn" id="export-grubhub-btn" aria-label="Export as Grubhub CSV">
+                        <span class="icon">🍔</span>
+                        <span class="label">Grubhub</span>
+                        <span class="hint">Menu import</span>
+                    </button>
                 </div>
             </section>
         </main>
@@ -207,6 +244,27 @@
                 <button class="modal-close" id="modal-close" aria-label="Close modal">&times;</button>
             </div>
             <div class="modal-body" id="modal-body"></div>
+        </div>
+    </div>
+
+    <!-- Image Manager Modal -->
+    <div class="modal-overlay" id="image-manager-overlay" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="image-manager-title">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="image-manager-title">Manage Images</h3>
+                <button class="modal-close" id="image-manager-close" aria-label="Close image manager">&times;</button>
+            </div>
+            <div class="modal-body" id="image-manager-body">
+                <div id="image-manager-list"></div>
+                <div class="image-manager-upload">
+                    <label for="image-upload-input">Upload a new image</label>
+                    <input type="file" id="image-upload-input" accept="image/*" aria-describedby="image-upload-help">
+                    <span id="image-upload-help" style="display: block; color: var(--text-muted); font-size: 0.8rem; margin-top: 4px;">JPG, PNG, WEBP, or GIF up to 10 MB.</span>
+                    <button id="image-upload-btn" class="btn btn-primary" style="margin-top: 12px;">
+                        <span>📤</span> Upload Image
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 

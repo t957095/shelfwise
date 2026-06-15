@@ -6,8 +6,8 @@
 
 ## Required Submissions
 
-- [ ] **Public GitHub repository** with complete source code
-  - Repo URL: _________________________________
+- [x] **Public GitHub repository** with complete source code
+  - Repo URL: https://github.com/t957095/shelfwise
 - [ ] **Demo video** (max 5 minutes) uploaded to YouTube/Vimeo
   - Video URL: _________________________________
 - [ ] **Project description** (max 500 words)
@@ -61,7 +61,7 @@ Key shots to capture:
 
 - [ ] Clear the database: `curl -X POST http://localhost:8000/api/clear`
 - [ ] Run a fresh demo and verify all 3 products load
-- [ ] Test all 4 export formats
+- [ ] Test all 11 export formats
 - [ ] Verify frontend works on mobile (Chrome DevTools)
 - [ ] Test Docker build: `docker-compose up --build`
 - [ ] Record demo video in 1920x1080

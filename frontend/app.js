@@ -15,11 +15,18 @@ let products = [];
 const upcTextarea = document.getElementById('upc-textarea');
 const csvFileInput = document.getElementById('csv-file');
 const submitBtn = document.getElementById('submit-btn');
-
+const demoBtn = document.getElementById('demo-btn');
 const statusSection = document.getElementById('status-section');
 const productsGrid = document.getElementById('products-grid');
 const productCount = document.getElementById('product-count');
 const toastContainer = document.getElementById('toast-container');
+const csvPreview = document.getElementById('csv-preview');
+const csvPreviewSummary = document.getElementById('csv-preview-summary');
+const csvPreviewSamples = document.getElementById('csv-preview-samples');
+const csvMaxRows = document.getElementById('csv-max-rows');
+const csvPreviewProcess = document.getElementById('csv-preview-process');
+const csvPreviewCancel = document.getElementById('csv-preview-cancel');
+let pendingCsvFile = null;
 
 // Initialize
 function init() {
@@ -123,7 +130,22 @@ function setupKeyboardShortcuts() {
 
 function bindEvents() {
     submitBtn.addEventListener('click', handleSubmit);
+    demoBtn.addEventListener('click', handleDemo);
+    csvFileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) previewCsv(e.target.files[0]);
+    });
+    csvPreviewProcess.addEventListener('click', processPreviewedCsv);
+    csvPreviewCancel.addEventListener('click', hideCsvPreview);
 
+    // Image manager modal
+    document.getElementById('image-manager-close').addEventListener('click', closeImageManager);
+    document.getElementById('image-manager-overlay').addEventListener('click', (e) => {
+        if (e.target.id === 'image-manager-overlay') closeImageManager();
+    });
+    document.getElementById('image-upload-btn').addEventListener('click', uploadManagedImage);
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeImageManager();
+    });
     document.getElementById('export-csv-btn').addEventListener('click', () => exportPortfolio('csv'));
     document.getElementById('export-json-btn').addEventListener('click', () => exportPortfolio('json'));
     document.getElementById('export-shopify-btn').addEventListener('click', () => exportPortfolio('shopify'));
@@ -132,6 +154,9 @@ function bindEvents() {
     document.getElementById('export-ebay-btn').addEventListener('click', () => exportPortfolio('ebay'));
     document.getElementById('export-etsy-btn').addEventListener('click', () => exportPortfolio('etsy'));
     document.getElementById('export-bigcommerce-btn').addEventListener('click', () => exportPortfolio('bigcommerce'));
+    document.getElementById('export-doordash-btn').addEventListener('click', () => exportPortfolio('doordash'));
+    document.getElementById('export-ubereats-btn').addEventListener('click', () => exportPortfolio('ubereats'));
+    document.getElementById('export-grubhub-btn').addEventListener('click', () => exportPortfolio('grubhub'));
 
     const sortSelect = document.getElementById('sort-select');
     if (sortSelect) {
@@ -192,12 +217,16 @@ function preventDefaults(e) {
     e.stopPropagation();
 }
 
-function handleDrop(e) {
+async function handleDrop(e) {
     const dt = e.dataTransfer;
     const files = dt.files;
     if (files.length > 0) {
         csvFileInput.files = files;
-        handleFileUpload(files[0]);
+        try {
+            await previewCsv(files[0]);
+        } catch (err) {
+            showToast(`Error: ${err.message}`, 'error');
+        }
     }
 }
 
@@ -247,11 +276,57 @@ async function handleSubmit() {
     }
 }
 
-async function handleFileUpload(file) {
+async function previewCsv(file) {
+    pendingCsvFile = file;
     const formData = new FormData();
     formData.append('file', file);
 
-    const res = await fetch(`${API_BASE}/api/upload-csv`, {
+    const res = await fetch(`${API_BASE}/api/upload-csv/preview?max_rows=5`, {
+        method: 'POST',
+        body: formData,
+    });
+
+    if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || 'Preview failed');
+    }
+
+    const data = await res.json();
+    const upcCol = data.detected_columns?.upc || 'unknown';
+    const summary = `Detected UPC column: <strong>${escapeHtml(upcCol)}</strong> · ${data.total_upcs} unique UPCs${data.truncated ? '+' : ''}`;
+    csvPreviewSummary.innerHTML = summary;
+
+    csvPreviewSamples.innerHTML = (data.sample || []).map(s => {
+        const name = s.seed?.name || 'Unknown product';
+        return `<li><strong>${escapeHtml(s.upc)}</strong> — ${escapeHtml(name)}</li>`;
+    }).join('');
+
+    csvPreview.style.display = 'block';
+    csvPreview.setAttribute('tabindex', '-1');
+    csvPreview.focus();
+}
+
+function hideCsvPreview() {
+    csvPreview.style.display = 'none';
+    csvPreviewSamples.innerHTML = '';
+    csvFileInput.value = '';
+    pendingCsvFile = null;
+}
+
+async function processPreviewedCsv() {
+    if (!pendingCsvFile) return;
+    const file = pendingCsvFile;
+    const maxRows = csvMaxRows.value;
+    hideCsvPreview();
+    setLoading(true);
+    await handleFileUpload(file, maxRows);
+}
+
+async function handleFileUpload(file, maxRows = '100') {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await fetch(`${API_BASE}/api/upload-csv?max_rows=${maxRows}`, {
         method: 'POST',
         body: formData,
     });
@@ -280,6 +355,15 @@ async function submitUPCs(upcs) {
 
     const data = await res.json();
     showToast(`Processing ${data.total} UPCs`, 'info');
+    startJobStream(data.job_id);
+}
+
+// Demo
+async function handleDemo() {
+    setLoading(true);
+    const res = await fetch(`${API_BASE}/api/demo`);
+    const data = await res.json();
+    showToast('Demo UPCs submitted', 'info');
     startJobStream(data.job_id);
 }
 
@@ -367,7 +451,7 @@ function renderProducts() {
             <div class="empty-state" style="grid-column: 1 / -1;">
                 <div class="icon">📦</div>
                 <h3>No products yet</h3>
-                <p>Enter UPC codes above to get started</p>
+                <p>Enter UPC codes above or load the demo to get started</p>
             </div>
         `;
         return;
@@ -418,9 +502,27 @@ function renderProductCard(p) {
     const confidenceLabel = confidence >= 0.7 ? 'High' :
                            confidence >= 0.4 ? 'Medium' : 'Low';
 
-    const imageHtml = p.image_url
-        ? `<img src="${escapeHtml(p.image_url)}" alt="${escapeHtml(p.name || 'Product image')}" class="product-image" loading="lazy" onclick="openLightbox('${escapeHtml(p.image_url)}', '${escapeHtml(p.name || 'Product')}')" style="cursor: zoom-in;" onerror="this.style.display='none'">`
+    const images = (p.images || []).filter(img => img && img.url);
+    if (images.length === 0 && p.image_url) {
+        images.push({ url: p.image_url, source: 'Best' });
+    }
+
+    const mainImage = images[0];
+    const thumbnails = images.slice(1, 5);
+
+    const mainImageHtml = mainImage
+        ? `<img src="${escapeHtml(mainImage.url)}" alt="${escapeHtml(p.name || 'Product image')}" class="product-image" loading="lazy" onclick="openLightbox(${escapeJsString(mainImage.url)}, ${escapeJsString(p.name || 'Product')})" style="cursor: zoom-in;" onerror="this.style.display='none'">`
         : `<div class="product-image placeholder" role="img" aria-label="No image available">📦</div>`;
+
+    const thumbnailsHtml = thumbnails.length > 0
+        ? `<div class="product-image-thumbnails" role="list" aria-label="Additional product images">` +
+          thumbnails.map((img, i) => `
+              <button class="product-thumbnail" role="listitem" aria-label="Product image ${i + 2} from ${escapeHtml(img.source || 'verified source')}" onclick="openLightbox(${escapeJsString(img.url)}, ${escapeJsString(p.name || 'Product')})">
+                  <img src="${escapeHtml(img.url)}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'">
+              </button>
+          `).join('') +
+          `</div>`
+        : '';
 
     const attributesHtml = Object.entries(p.attributes || {})
         .slice(0, 4)
@@ -429,15 +531,16 @@ function renderProductCard(p) {
 
     const citationsHtml = (p.citations || []).slice(0, 3).map(c => `
         <div class="citation-item">
-            <span class="citation-source">${escapeHtml(c.source)}</span>
-            <span class="citation-fields">${escapeHtml(c.fields.join(', '))}</span>
-            <span class="citation-confidence">${(c.confidence * 100).toFixed(0)}%</span>
+            <span class="citation-source">${escapeHtml(c.source || 'Source')}</span>
+            <span class="citation-fields">${escapeHtml(Array.isArray(c.fields) ? c.fields.join(', ') : '')}</span>
+            <span class="citation-confidence">${(((c.confidence || 0) * 100)).toFixed(0)}%</span>
         </div>
     `).join('');
 
     return `
         <article class="product-card" tabindex="0" aria-label="${escapeHtml(p.name || 'Unknown product')}">
-            ${imageHtml}
+            ${mainImageHtml}
+            ${thumbnailsHtml}
             <div class="product-content">
                 <div class="product-header">
                     <h3 class="product-name">${escapeHtml(p.name || 'Unknown Product')}</h3>
@@ -457,6 +560,9 @@ function renderProductCard(p) {
                     <button class="btn btn-outline btn-sm" onclick="showReasoningTrace('${p.upc}')" aria-label="View reasoning trace for ${escapeHtml(p.name || p.upc)}">
                         🧠 Reasoning
                     </button>
+                    <button class="btn btn-outline btn-sm" onclick="openImageManager('${p.upc}')" aria-label="Manage images for ${escapeHtml(p.name || p.upc)}">
+                        🖼️ Images
+                    </button>
                     ${p.source_url ? `<a href="${escapeHtml(p.source_url)}" target="_blank" rel="noopener" class="btn btn-outline btn-sm">🔗 Source</a>` : ''}
                 </div>
             </div>
@@ -469,6 +575,14 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+function escapeJsString(text) {
+    return JSON.stringify(String(text || ''))
+        .replace(/&/g, '\\u0026')
+        .replace(/</g, '\\u003c')
+        .replace(/>/g, '\\u003e')
+        .replace(/"/g, '&quot;');
 }
 
 // Reasoning Trace Modal
@@ -490,9 +604,9 @@ function showReasoningTrace(upc) {
 
     const citationsHtml = (product.citations || []).map(c => `
         <div class="citation-item" style="margin-bottom: 8px;">
-            <span class="citation-source">${escapeHtml(c.source)}</span>
-            <span class="citation-fields">${escapeHtml(c.fields.join(', '))}</span>
-            <span class="citation-confidence">${(c.confidence * 100).toFixed(0)}%</span>
+            <span class="citation-source">${escapeHtml(c.source || 'Source')}</span>
+            <span class="citation-fields">${escapeHtml(Array.isArray(c.fields) ? c.fields.join(', ') : '')}</span>
+            <span class="citation-confidence">${(((c.confidence || 0) * 100)).toFixed(0)}%</span>
             ${c.note ? `<div style="color: var(--text-muted); margin-top: 4px; font-size: 0.8rem;">${escapeHtml(c.note)}</div>` : ''}
         </div>
     `).join('');
@@ -526,6 +640,116 @@ function closeModal() {
     const modal = document.getElementById('modal-overlay');
     modal.classList.remove('active');
     modal.setAttribute('aria-hidden', 'true');
+}
+
+let imageManagerUpc = null;
+
+function openImageManager(upc) {
+    const product = products.find(p => p.upc === upc);
+    if (!product) return;
+    imageManagerUpc = upc;
+    renderImageManager(product);
+    const overlay = document.getElementById('image-manager-overlay');
+    overlay.classList.add('active');
+    overlay.setAttribute('aria-hidden', 'false');
+    document.getElementById('image-manager-close').focus();
+}
+
+function closeImageManager() {
+    const overlay = document.getElementById('image-manager-overlay');
+    overlay.classList.remove('active');
+    overlay.setAttribute('aria-hidden', 'true');
+    imageManagerUpc = null;
+    document.getElementById('image-upload-input').value = '';
+}
+
+function renderImageManager(product) {
+    const list = document.getElementById('image-manager-list');
+    const images = (product.images || []).filter(img => img && img.url);
+    if (images.length === 0 && product.image_url) {
+        images.push({ url: product.image_url, source: 'Primary' });
+    }
+
+    if (images.length === 0) {
+        list.innerHTML = `<p style="color: var(--text-muted);">No images yet. Upload one below.</p>`;
+        return;
+    }
+
+    list.innerHTML = images.map((img, i) => `
+        <div class="image-manager-item">
+            <img src="${escapeHtml(img.url)}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'">
+            <div class="image-manager-meta">
+                <span class="image-manager-source">${escapeHtml(img.source || 'Verified source')}</span>
+                ${img.url === product.image_url ? '<span class="image-manager-primary">Primary</span>' : ''}
+            </div>
+            <button class="btn btn-danger btn-sm" onclick="deleteManagedImage(${escapeJsString(img.url)})" aria-label="Delete image ${i + 1}">
+                🗑️ Delete
+            </button>
+        </div>
+    `).join('');
+}
+
+async function uploadManagedImage() {
+    if (!imageManagerUpc) return;
+    const input = document.getElementById('image-upload-input');
+    const file = input.files[0];
+    if (!file) {
+        showToast('Select an image first', 'error');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const res = await fetch(`${API_BASE}/api/products/${imageManagerUpc}/images`, {
+            method: 'POST',
+            body: formData,
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Upload failed');
+        }
+        const data = await res.json();
+        const product = products.find(p => p.upc === imageManagerUpc);
+        if (product) {
+            product.images = data.images;
+            product.image_url = data.image_url;
+        }
+        renderImageManager(product);
+        renderProducts();
+        input.value = '';
+        showToast('Image uploaded', 'info');
+    } catch (err) {
+        showToast(`Error: ${err.message}`, 'error');
+    }
+}
+
+async function deleteManagedImage(url) {
+    if (!imageManagerUpc || !url) return;
+    if (!confirm('Delete this image?')) return;
+
+    try {
+        const encoded = encodeURIComponent(url);
+        const res = await fetch(`${API_BASE}/api/products/${imageManagerUpc}/images?url=${encoded}`, {
+            method: 'DELETE',
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Delete failed');
+        }
+        const data = await res.json();
+        const product = products.find(p => p.upc === imageManagerUpc);
+        if (product) {
+            product.images = data.images;
+            product.image_url = data.image_url;
+        }
+        renderImageManager(product);
+        renderProducts();
+        showToast('Image deleted', 'info');
+    } catch (err) {
+        showToast(`Error: ${err.message}`, 'error');
+    }
 }
 
 function openLightbox(url, caption) {
@@ -579,6 +803,7 @@ async function exportPortfolio(format) {
 // Loading state
 function setLoading(loading) {
     submitBtn.disabled = loading;
+    demoBtn.disabled = loading;
     submitBtn.textContent = loading ? 'Processing...' : 'Submit UPCs';
 }
 

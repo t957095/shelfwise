@@ -9,15 +9,15 @@ Features:
 - Structured logging per scrape
 """
 
-import httpx
-import os
-import re
 import asyncio
 import logging
+import os
+import re
 import time
-import random
-from typing import List, Dict, Optional, Any, Callable
+from typing import Any, Callable, Dict, List, Optional
 from urllib.parse import urlparse
+
+import httpx
 from bs4 import BeautifulSoup
 
 logger = logging.getLogger("shelfwise.scraper")
@@ -34,98 +34,112 @@ SOURCE_WEIGHTS = {
     "UPCDatabase": 0.50,
     "Brave Search": 0.45,
     "Google Search": 0.40,
+    "Demo Fallback": 0.40,
 }
 
-DEFAULT_HEADERS = {
-    "User-Agent": "ShelfWise/1.0 (AI Product Portfolio Builder; contact@shelfwise.local)"
-}
+DEFAULT_HEADERS = {"User-Agent": "ShelfWise/1.0 (AI Product Portfolio Builder; contact@shelfwise.local)"}
 
 ROTATING_HEADERS = [
     {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept-Encoding": "gzip, deflate, br",
-        "DNT": "1",
-        "Upgrade-Insecure-Requests": "1",
-        "Sec-Ch-Ua": '"Google Chrome";v="125", "Chromium";v="125", "Not.A/Brand";v="24"',
-        "Sec-Ch-Ua-Mobile": "?0",
-        "Sec-Ch-Ua-Platform": '"Windows"',
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
     },
     {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept-Encoding": "gzip, deflate, br",
-        "DNT": "1",
-        "Upgrade-Insecure-Requests": "1",
-        "Sec-Ch-Ua": '"Google Chrome";v="125", "Chromium";v="125", "Not.A/Brand";v="24"',
-        "Sec-Ch-Ua-Mobile": "?0",
-        "Sec-Ch-Ua-Platform": '"macOS"',
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
     },
     {
-        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept-Encoding": "gzip, deflate, br",
-        "DNT": "1",
-        "Upgrade-Insecure-Requests": "1",
-        "Sec-Ch-Ua": '"Google Chrome";v="125", "Chromium";v="125", "Not.A/Brand";v="24"',
-        "Sec-Ch-Ua-Mobile": "?0",
-        "Sec-Ch-Ua-Platform": '"Linux"',
-    },
-    {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5",
-        "Accept-Encoding": "gzip, deflate, br",
-        "DNT": "1",
-        "Upgrade-Insecure-Requests": "1",
-        "Sec-Fetch-Dest": "document",
-        "Sec-Fetch-Mode": "navigate",
-        "Sec-Fetch-Site": "none",
-    },
-    {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept-Encoding": "gzip, deflate, br",
-        "DNT": "1",
-        "Upgrade-Insecure-Requests": "1",
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
     },
 ]
 
-# Concurrency / politeness knobs
-MAX_INFLIGHT_REQUESTS = 100
-MAX_PER_DOMAIN = 5
-DOMAIN_DELAY_SECONDS = 0.1
-MIN_SUCCESS_TO_STOP = 2
-UPC_TIME_BUDGET_SECONDS = 15.0
-MAX_RETRY_WAIT_SECONDS = 5.0
+# Circuit breaker state (overridable via env vars)
+CIRCUIT_FAILURE_THRESHOLD = int(os.environ.get("SHELFWISE_CIRCUIT_FAILURE_THRESHOLD", "5"))
+CIRCUIT_RECOVERY_TIMEOUT = float(os.environ.get("SHELFWISE_CIRCUIT_RECOVERY_TIMEOUT", "60.0"))
 
-# Names that are not real product titles and should not count toward early stop
-_BLOCKED_PRODUCT_NAMES = {
-    "check digit", "product not found", "unknown product", "not found",
-    "product", "unknown", "n/a", "na", "no data", "error",
+# Retry / timeout configuration
+DEFAULT_RETRIES = int(os.environ.get("SHELFWISE_RETRIES", "2"))
+DEFAULT_TIMEOUT = float(os.environ.get("SHELFWISE_REQUEST_TIMEOUT", "10.0"))
+
+
+class ScraperHealth:
+    """Track per-source success/failure rates for adaptive scraping decisions."""
+
+    def __init__(self):
+        self._calls: Dict[str, int] = {}
+        self._successes: Dict[str, int] = {}
+        self._failures: Dict[str, int] = {}
+        self._latencies: Dict[str, List[float]] = {}
+        self._lock = asyncio.Lock()
+
+    async def record(self, source: str, success: bool, latency: float):
+        async with self._lock:
+            self._calls[source] = self._calls.get(source, 0) + 1
+            self._latencies.setdefault(source, []).append(latency)
+            # Keep last 100 latency samples
+            self._latencies[source] = self._latencies[source][-100:]
+            if success:
+                self._successes[source] = self._successes.get(source, 0) + 1
+            else:
+                self._failures[source] = self._failures.get(source, 0) + 1
+
+    async def stats(self) -> Dict[str, Dict[str, Any]]:
+        async with self._lock:
+            result = {}
+            for source in self._calls:
+                calls = self._calls[source]
+                successes = self._successes.get(source, 0)
+                failures = self._failures.get(source, 0)
+                latencies = self._latencies.get(source, [])
+                result[source] = {
+                    "calls": calls,
+                    "successes": successes,
+                    "failures": failures,
+                    "success_rate": round(successes / calls, 3) if calls else 0.0,
+                    "avg_latency_ms": round(sum(latencies) / len(latencies) * 1000, 1) if latencies else 0.0,
+                }
+            return result
+
+    def success_rate(self, source: str) -> float:
+        calls = self._calls.get(source, 0)
+        successes = self._successes.get(source, 0)
+        return successes / calls if calls else 1.0
+
+
+# Demo fallback data for hackathon demo
+DEMO_FALLBACK_DATA = {
+    "049000050103": {
+        "source": "Demo Fallback",
+        "source_url": None,
+        "name": "Coca-Cola Classic",
+        "brand": "Coca-Cola",
+        "category": "Beverages",
+        "description": "Coca-Cola Classic 12 fl oz (355 mL) can. The iconic sparkling soft drink.",
+        "image_urls": [],
+        "attributes": {"size": "12 oz", "container": "Can", "flavor": "Classic"},
+        "raw": {"demo": True},
+    },
+    "022000020806": {
+        "source": "Demo Fallback",
+        "source_url": None,
+        "name": "M&M's Milk Chocolate",
+        "brand": "Mars",
+        "category": "Candy & Chocolate",
+        "description": "M&M's Milk Chocolate Candies, 1.69 oz (47.9 g) bag. Colorful candy-coated chocolate.",
+        "image_urls": [],
+        "attributes": {"size": "1.69 oz", "container": "Bag", "flavor": "Milk Chocolate"},
+        "raw": {"demo": True},
+    },
+    "012000001307": {
+        "source": "Demo Fallback",
+        "source_url": None,
+        "name": "Pepsi",
+        "brand": "Pepsi",
+        "category": "Beverages",
+        "description": "Pepsi Cola 12 fl oz (355 mL) can. Refreshing cola soft drink.",
+        "image_urls": [],
+        "attributes": {"size": "12 oz", "container": "Can", "flavor": "Cola"},
+        "raw": {"demo": True},
+    },
 }
-
-# Circuit breaker state
-CIRCUIT_FAILURE_THRESHOLD = 5
-CIRCUIT_RECOVERY_TIMEOUT = 60.0
-
-
-def _is_transient_error(e: Exception) -> bool:
-    """Decide whether an exception should count toward the circuit breaker."""
-    if isinstance(e, httpx.HTTPStatusError):
-        code = e.response.status_code
-        # 4xx client errors (except 429 rate-limit) are not transient
-        if 400 <= code < 500 and code != 429:
-            return False
-        return True
-    # Timeouts, connect errors, SSL issues, etc. are transient
-    if isinstance(e, (httpx.TimeoutException, httpx.ConnectError, httpx.NetworkError)):
-        return True
-    return False
 
 
 def _is_valid_image_url(url: str) -> bool:
@@ -145,8 +159,12 @@ def _is_valid_image_url(url: str) -> bool:
 class CircuitBreaker:
     """Simple circuit breaker for external APIs."""
 
-    def __init__(self, name: str, failure_threshold: int = CIRCUIT_FAILURE_THRESHOLD,
-                 recovery_timeout: float = CIRCUIT_RECOVERY_TIMEOUT):
+    def __init__(
+        self,
+        name: str,
+        failure_threshold: int = CIRCUIT_FAILURE_THRESHOLD,
+        recovery_timeout: float = CIRCUIT_RECOVERY_TIMEOUT,
+    ):
         self.name = name
         self.failure_threshold = failure_threshold
         self.recovery_timeout = recovery_timeout
@@ -172,65 +190,24 @@ class CircuitBreaker:
                     self.failures = 0
                     logger.info(f"Circuit breaker {self.name}: closed")
             return result
-        except Exception as e:
+        except Exception:
             async with self._lock:
-                if self.state == "half_open":
-                    # A single failure in half-open immediately reopens
+                self.failures += 1
+                self.last_failure_time = time.time()
+                if self.failures >= self.failure_threshold:
                     self.state = "open"
-                    self.last_failure_time = time.time()
-                    logger.warning(f"Circuit breaker {self.name}: re-opened from half-open")
-                    raise
-                if _is_transient_error(e):
-                    self.failures += 1
-                    self.last_failure_time = time.time()
-                    if self.failures >= self.failure_threshold:
-                        self.state = "open"
-                        logger.warning(f"Circuit breaker {self.name}: OPEN after {self.failures} transient failures")
-                else:
-                    # Non-transient failures don't count toward the breaker
-                    logger.debug(f"Circuit breaker {self.name}: non-transient failure ignored ({e})")
+                    logger.warning(f"Circuit breaker {self.name}: OPEN after {self.failures} failures")
             raise
 
 
-class DomainLimiter:
-    """Simple per-domain concurrency + delay limiter."""
-
-    def __init__(self, max_concurrent: int = MAX_PER_DOMAIN, delay: float = DOMAIN_DELAY_SECONDS):
-        self.sem = asyncio.Semaphore(max_concurrent)
-        self.delay = delay
-        self._last_release: float = 0.0
-        self._lock = asyncio.Lock()
-
-    async def acquire(self):
-        await self.sem.acquire()
-        async with self._lock:
-            now = time.monotonic()
-            elapsed = now - self._last_release
-            if elapsed < self.delay:
-                await asyncio.sleep(self.delay - elapsed)
-            self._last_release = time.monotonic()
-
-    def release(self):
-        self.sem.release()
-
-
 class UPCScraper:
-    def __init__(self, client: httpx.AsyncClient):
+    def __init__(self, client: httpx.AsyncClient, health: Optional[ScraperHealth] = None):
         self.client = client
         self.request_count = 0
         self._inflight: Dict[str, asyncio.Future] = {}
         self._inflight_lock = asyncio.Lock()
         self.circuits: Dict[str, CircuitBreaker] = {}
-        self._global_sem = asyncio.Semaphore(MAX_INFLIGHT_REQUESTS)
-        self._domain_limiters: Dict[str, DomainLimiter] = {}
-        self._domain_lock = asyncio.Lock()
-        self._dead_domains: set = set()
-
-    def _domain_limiter(self, url: str) -> DomainLimiter:
-        domain = urlparse(url).netloc.lower()
-        if domain not in self._domain_limiters:
-            self._domain_limiters[domain] = DomainLimiter()
-        return self._domain_limiters[domain]
+        self.health = health or ScraperHealth()
 
     def _get_circuit(self, name: str) -> CircuitBreaker:
         if name not in self.circuits:
@@ -242,71 +219,41 @@ class UPCScraper:
         self.request_count += 1
         return headers
 
-    def _is_dead_domain(self, url: str) -> bool:
-        return urlparse(url).netloc.lower() in self._dead_domains
-
-    async def _get_with_retry(self, url: str, timeout: float = 10.0, retries: int = 1,
-                              **kwargs) -> httpx.Response:
-        """GET with polite concurrency control and status-aware exponential backoff.
-
-        Design goals:
-        - Fail fast on 4xx client errors (including 429) — retrying wastes time.
-        - Retry transient 5xx/server errors once with a capped wait.
-        - Never retry unresolvable/dead domains or SSL cert failures.
-        """
+    async def _get_with_retry(
+        self,
+        url: str,
+        timeout: Optional[float] = None,
+        retries: Optional[int] = None,
+        **kwargs,
+    ) -> httpx.Response:
+        """GET with exponential backoff retry and error classification."""
+        timeout = timeout if timeout is not None else DEFAULT_TIMEOUT
+        retries = retries if retries is not None else DEFAULT_RETRIES
+        last_error = None
         # Build headers from kwarg or default
         headers = kwargs.pop("headers", DEFAULT_HEADERS)
         if isinstance(headers, dict):
             headers = dict(headers)  # copy
         else:
             headers = dict(DEFAULT_HEADERS)
-
-        domain = urlparse(url).netloc.lower()
-        if domain in self._dead_domains:
-            raise httpx.ConnectError(f"Skipping known dead domain: {domain}")
-
-        domain_limiter = self._domain_limiter(url)
-
         for attempt in range(retries + 1):
             try:
-                async with self._global_sem:
-                    await domain_limiter.acquire()
-                    try:
-                        response = await self.client.get(url, headers=headers, timeout=timeout, **kwargs)
-                        response.raise_for_status()
-                        return response
-                    finally:
-                        domain_limiter.release()
-            except httpx.HTTPStatusError as e:
-                status = e.response.status_code
-                # All 4xx (including 429) are client errors; retrying rarely helps.
-                if 400 <= status < 500:
-                    raise
-                # 5xx and rare 3xx errors get one short retry.
-                if attempt < retries:
-                    wait = min(2 ** attempt + random.uniform(0, 1), MAX_RETRY_WAIT_SECONDS)
-                    logger.debug(f"Retry {attempt + 1}/{retries} for {url} (HTTP {status}): sleeping {wait:.1f}s")
+                response = await self.client.get(url, headers=headers, timeout=timeout, **kwargs)
+                response.raise_for_status()
+                return response
+            except Exception as e:
+                last_error = e
+                # Classify errors: don't retry client errors (4xx) except 429
+                should_retry = attempt < retries
+                if isinstance(e, httpx.HTTPStatusError):
+                    status = e.response.status_code
+                    if 400 <= status < 500 and status != 429:
+                        should_retry = False
+                if should_retry:
+                    wait = min(2**attempt, 30)  # cap backoff at 30s
+                    logger.warning(f"Retry {attempt + 1}/{retries} for {url}: {e}")
                     await asyncio.sleep(wait)
-                else:
-                    raise
-            except (httpx.TimeoutException, httpx.ConnectError, httpx.NetworkError) as e:
-                err_text = str(e).lower()
-                # Dead domains / bad SSL are permanent; mark and fail fast.
-                if any(marker in err_text for marker in ("getaddrinfo", "name or service not known",
-                                                         "nodename nor servprovided", "certificate verify failed")):
-                    self._dead_domains.add(domain)
-                    raise
-                if attempt < retries:
-                    wait = min(2 ** attempt + random.uniform(0, 1), MAX_RETRY_WAIT_SECONDS)
-                    logger.debug(f"Retry {attempt + 1}/{retries} for {url}: {e}")
-                    await asyncio.sleep(wait)
-                else:
-                    raise
-            except Exception:
-                # Unknown errors are not worth retrying.
-                raise
-        # Unreachable — each branch either returns or raises.
-        raise RuntimeError("_get_with_retry exhausted without result")
+        raise last_error
 
     async def scrape_all(self, upc: str) -> List[Dict[str, Any]]:
         """Scrape all sources for a UPC with request coalescing.
@@ -331,152 +278,104 @@ class UPCScraper:
                     del self._inflight[upc]
 
     async def _scrape_all_impl(self, upc: str) -> List[Dict[str, Any]]:
-        """Internal: scrape sources with bounded concurrency, politeness, and early stopping."""
+        """Internal: scrape all sources concurrently including registry sources."""
         results = []
         start = time.time()
 
         # Core hardcoded scrapers (proven, high-quality parsers)
         core_scrapers = [
-            ("Open Food Facts", self._open_food_facts, 0.90),
-            ("UPCItemDB", self._upcitemdb, 0.85),
-            ("BarcodeLookup", self._barcode_lookup, 0.75),
-            ("Go-UPC", self._go_upc, 0.70),
-            ("Buycott", self._buycott, 0.65),
-            ("EANdata", self._eandata, 0.60),
-            ("Lookify", self._lookify, 0.55),
-            ("UPCDatabase", self._upcdatabase, 0.50),
-            ("Brave Search", self._brave_search, 0.45),
-            ("Google Search", self._google_search, 0.40),
+            ("Open Food Facts", self._open_food_facts),
+            ("UPCItemDB", self._upcitemdb),
+            ("BarcodeLookup", self._barcode_lookup),
+            ("Go-UPC", self._go_upc),
+            ("Buycott", self._buycott),
+            ("EANdata", self._eandata),
+            ("Lookify", self._lookify),
+            ("UPCDatabase", self._upcdatabase),
+            ("Brave Search", self._brave_search),
+            ("Google Search", self._google_search),
         ]
 
-        # Dynamic registry scrapers (hundreds of additional sources)
-        registry_sources = self._get_registry_sources()
-        registry_scrapers = [
-            (src["name"], self._make_registry_scraper(src), src.get("weight", 0.30))
-            for src in registry_sources
-        ]
+        # Dynamic registry scrapers (limit to top weighted sources for speed/quality).
+        # Default to 10 registry sources per scrape to keep live demos responsive;
+        # override with SHELFWISE_MAX_REGISTRY_SOURCES env var.
+        registry_max = int(os.environ.get("SHELFWISE_MAX_REGISTRY_SOURCES", "10"))
+        registry_sources = self._get_registry_sources(max_sources=registry_max)
+        # Pair each source with its scraper to preserve weight for sorting
+        registry_pairs = [(src, self._make_registry_scraper(src)) for src in registry_sources]
+
+        # Combine all scrapers: core + registry
+        all_scrapers = core_scrapers + [(src["name"], fn) for src, fn in registry_pairs]
 
         # Deduplicate by source name (registry may duplicate core sources)
         seen_names = set()
         unique_scrapers = []
-        for name, fn, weight in core_scrapers + registry_scrapers:
+        for name, fn in all_scrapers:
             if name not in seen_names:
                 seen_names.add(name)
-                unique_scrapers.append((name, fn, weight))
+                unique_scrapers.append((name, fn))
 
-        # Sort by weight descending so high-confidence sources run first
-        unique_scrapers.sort(key=lambda x: x[2], reverse=True)
+        # Run all unique sources up to a safety ceiling of 300
+        max_concurrent = 300
+        if len(unique_scrapers) > max_concurrent:
+            sorted_registry = sorted(registry_pairs, key=lambda p: p[0].get("weight", 0.3), reverse=True)
+            core_names = {n for n, _ in core_scrapers}
+            extra_registry = [(src["name"], fn) for src, fn in sorted_registry if src["name"] not in core_names]
+            unique_scrapers = core_scrapers + extra_registry[: max_concurrent - len(core_scrapers)]
 
-        # Hard ceiling for safety
-        max_sources = 300
-        if len(unique_scrapers) > max_sources:
-            unique_scrapers = unique_scrapers[:max_sources]
+        tasks = [self._safe_scrape(name, fn, upc) for name, fn in unique_scrapers]
+        source_results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        def _is_real_success(r: Dict[str, Any]) -> bool:
-            if not r.get("success"):
-                return False
-            name = str(r.get("name", "")).strip().lower()
-            if not name or name in _BLOCKED_PRODUCT_NAMES:
-                return False
-            return True
-
-        def _enough_success() -> bool:
-            return sum(1 for r in results if _is_real_success(r)) >= MIN_SUCCESS_TO_STOP
-
-        sem = asyncio.Semaphore(MAX_INFLIGHT_REQUESTS)
-
-        async def bounded_scrape(name, fn):
-            async with sem:
-                return await self._safe_scrape(name, fn, upc)
-
-        # Launch all tasks bounded by the semaphore; high-weight tasks start first
-        pending = set()
-        for name, fn, _ in unique_scrapers:
-            task = asyncio.create_task(bounded_scrape(name, fn))
-            pending.add(task)
-            # Don't queue more than 2x the concurrency limit ahead of time
-            if len(pending) >= MAX_INFLIGHT_REQUESTS * 2:
-                done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
-                for task in done:
-                    r = task.result()
-                    if isinstance(r, dict):
-                        results.append(r)
-                if _enough_success():
-                    break
-
-        # Process remaining tasks as they complete
-        while pending:
-            done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
-            for task in done:
-                r = task.result()
-                if isinstance(r, dict):
-                    results.append(r)
-
-            elapsed = time.time() - start
-            successful = sum(1 for r in results if r.get("success"))
-            logger.debug(f"UPC {upc}: {successful}/{len(results)} successful, {elapsed:.1f}s")
-
-            if _enough_success():
-                logger.info(f"UPC {upc}: early stop after {len(results)} sources ({successful} successful)")
-                for task in pending:
-                    task.cancel()
-                try:
-                    await asyncio.gather(*pending, return_exceptions=True)
-                except Exception:
-                    pass
-                break
-
-            # Hard time budget for obscure products
-            if elapsed > UPC_TIME_BUDGET_SECONDS:
-                logger.info(f"UPC {upc}: time budget reached after {len(results)} sources")
-                for task in pending:
-                    task.cancel()
-                try:
-                    await asyncio.gather(*pending, return_exceptions=True)
-                except Exception:
-                    pass
-                break
+        for r in source_results:
+            if isinstance(r, dict):
+                results.append(r)
 
         elapsed = time.time() - start
-        total_sources = len(results)
+        total_sources = len(unique_scrapers)
         successful = sum(1 for r in results if r.get("success"))
         logger.info(f"UPC {upc}: scraped {successful}/{total_sources} sources in {elapsed:.2f}s")
 
+        if not results:
+            fallback = self._get_demo_fallback(upc)
+            if fallback:
+                results.append(fallback)
+
         return results
-    
-    def _get_registry_sources(self) -> List[Dict[str, Any]]:
+
+    def _get_registry_sources(self, max_sources: int = None) -> List[Dict[str, Any]]:
         """Load scraper sources from registry file."""
         try:
             from backend.scraper_registry import ScraperRegistry
+
             registry = ScraperRegistry()
-            return registry.get_enabled_sources()
+            return registry.get_enabled_sources(max_sources=max_sources)
         except Exception as e:
             logger.warning(f"Could not load scraper registry: {e}")
             return []
-    
+
     def _make_registry_scraper(self, source_def: Dict[str, Any]):
         """Create a dynamic scraper function from a registry definition."""
+
         async def _scraper(upc: str) -> Dict[str, Any]:
             return await self._registry_scrape(source_def, upc)
+
         return _scraper
-    
+
     async def _registry_scrape(self, source_def: Dict[str, Any], upc: str) -> Dict[str, Any]:
         """Dynamic scraper for registry-defined sources."""
-        import json
-        from bs4 import BeautifulSoup
-        
+
         source_name = source_def.get("name", "Unknown")
         source_type = source_def.get("type", "html")
         url_template = source_def.get("url_template", "")
         method = source_def.get("method", "GET")
-        timeout = source_def.get("timeout", 8)
-        
+        timeout = source_def.get("timeout", 10)
+
         if not url_template:
             return self._fail(source_name, "", {}, "No URL template")
-        
+
         # Build URL
         url = url_template.replace("{upc}", upc)
-        
+
         # Handle auth placeholders
         requires_auth = source_def.get("requires_auth")
         if requires_auth and "{" in url:
@@ -484,7 +383,7 @@ class UPCScraper:
             if not api_key:
                 return self._fail(source_name, url, {}, f"Auth key {requires_auth} not configured")
             url = url.replace(f"{{{requires_auth}}}", api_key)
-        
+
         # Make request
         headers = self._next_headers()
         try:
@@ -492,22 +391,22 @@ class UPCScraper:
                 response = await self._get_with_retry(url, headers=headers, timeout=timeout)
             else:
                 response = await self._get_with_retry(url, headers=headers, timeout=timeout)
-            
+
             data = response.json() if source_type == "api" else None
         except Exception as e:
             return self._fail(source_name, url, {}, str(e))
-        
+
         # Extract data based on type
         if source_type == "api":
             return self._extract_api_data(source_def, data, upc, url)
         else:
             return self._extract_html_data(source_def, response.text, upc, url)
-    
+
     def _extract_api_data(self, source_def: Dict[str, Any], data: Dict, upc: str, url: str) -> Dict[str, Any]:
         """Extract structured data from JSON API response."""
         source_name = source_def.get("name", "Unknown")
         extract = source_def.get("extract", {})
-        
+
         def get_nested(data, path):
             """Safely navigate nested dict/list structure."""
             current = data
@@ -521,13 +420,13 @@ class UPCScraper:
                 else:
                     return None
             return current
-        
+
         name = get_nested(data, extract.get("name", []))
         brand = get_nested(data, extract.get("brand", []))
         category = get_nested(data, extract.get("category", []))
         description = get_nested(data, extract.get("description", []))
         image_urls_raw = get_nested(data, extract.get("image_urls", []))
-        
+
         # Handle image URLs (could be string, list, or dict)
         image_urls = []
         if isinstance(image_urls_raw, str):
@@ -539,7 +438,7 @@ class UPCScraper:
             for v in image_urls_raw.values():
                 if isinstance(v, str) and _is_valid_image_url(v):
                     image_urls.append(v)
-        
+
         # Extract attributes
         attributes = {}
         attrs_def = extract.get("attributes", [])
@@ -547,7 +446,7 @@ class UPCScraper:
             attrs_data = get_nested(data, attrs_def)
             if isinstance(attrs_data, dict):
                 attributes = attrs_data
-        
+
         # Check success condition
         success_condition = source_def.get("success_condition")
         if success_condition:
@@ -555,26 +454,35 @@ class UPCScraper:
             condition_value = success_condition[1]
             actual_value = get_nested(data, [condition_field])
             if actual_value != condition_value:
-                return self._fail(source_name, url, data, f"Success condition not met: {condition_field}={actual_value}")
-        
+                return self._fail(
+                    source_name, url, data, f"Success condition not met: {condition_field}={actual_value}"
+                )
+
         if not name:
             return self._fail(source_name, url, data, "Product not found")
-        
+
         return {
-            "upc": upc, "source": source_name, "source_url": url,
-            "name": name, "brand": brand, "category": category,
-            "description": description, "image_urls": image_urls,
-            "attributes": attributes, "raw": data,
-            "success": True, "error": None,
+            "upc": upc,
+            "source": source_name,
+            "source_url": url,
+            "name": name,
+            "brand": brand,
+            "category": category,
+            "description": description,
+            "image_urls": image_urls,
+            "attributes": attributes,
+            "raw": data,
+            "success": True,
+            "error": None,
         }
-    
+
     def _extract_html_data(self, source_def: Dict[str, Any], html: str, upc: str, url: str) -> Dict[str, Any]:
         """Extract data from HTML response using CSS selectors."""
         source_name = source_def.get("name", "Unknown")
         selectors = source_def.get("selectors", {})
-        
+
         soup = BeautifulSoup(html, "html.parser")
-        
+
         def extract_field(selector_list):
             """Try multiple selectors until one finds content."""
             if not selector_list:
@@ -607,16 +515,16 @@ class UPCScraper:
                 except Exception:
                     continue
             return None
-        
+
         name = extract_field(selectors.get("name", []))
         brand = extract_field(selectors.get("brand", []))
         description = extract_field(selectors.get("description", []))
         image_url = extract_field(selectors.get("image_urls", []))
-        
+
         image_urls = []
         if image_url and _is_valid_image_url(image_url):
             image_urls = [image_url]
-        
+
         # Extract attributes from table rows
         attributes = {}
         attr_selectors = selectors.get("attributes", [])
@@ -633,29 +541,39 @@ class UPCScraper:
                                 attributes[key] = val
             except Exception:
                 pass
-        
+
         if not name:
             return self._fail(source_name, url, {}, "Product not found")
-        
+
         return {
-            "upc": upc, "source": source_name, "source_url": url,
-            "name": name, "brand": brand, "category": None,
-            "description": description, "image_urls": image_urls,
-            "attributes": attributes, "raw": {"html_snippet": soup.get_text()[:500]},
-            "success": True, "error": None,
+            "upc": upc,
+            "source": source_name,
+            "source_url": url,
+            "name": name,
+            "brand": brand,
+            "category": None,
+            "description": description,
+            "image_urls": image_urls,
+            "attributes": attributes,
+            "raw": {"html_snippet": soup.get_text()[:500]},
+            "success": True,
+            "error": None,
         }
 
     async def _safe_scrape(self, name: str, scrape_fn, upc: str) -> Dict[str, Any]:
-        """Wrap scraper in circuit breaker + try/except + timing."""
+        """Wrap scraper in circuit breaker + try/except + timing + health tracking."""
         start = time.time()
         try:
             cb = self._get_circuit(name)
             result = await cb.call(scrape_fn, upc)
-            result["_elapsed_ms"] = round((time.time() - start) * 1000, 1)
+            elapsed = time.time() - start
+            result["_elapsed_ms"] = round(elapsed * 1000, 1)
+            await self.health.record(name, result.get("success", True), elapsed)
             return result
         except Exception as e:
-            elapsed = round((time.time() - start) * 1000, 1)
-            logger.warning(f"Scraper {name} failed for {upc} ({elapsed}ms): {e}")
+            elapsed = time.time() - start
+            logger.warning(f"Scraper {name} failed for {upc} ({elapsed * 1000:.1f}ms): {e}")
+            await self.health.record(name, False, elapsed)
             return {
                 "upc": upc,
                 "source": name,
@@ -669,7 +587,7 @@ class UPCScraper:
                 "raw": {},
                 "success": False,
                 "error": str(e),
-                "_elapsed_ms": elapsed,
+                "_elapsed_ms": round(elapsed * 1000, 1),
             }
 
     async def _open_food_facts(self, upc: str) -> Dict[str, Any]:
@@ -699,11 +617,18 @@ class UPCScraper:
             attributes["nutriments"] = product["nutriments"]
 
         return {
-            "upc": upc, "source": "Open Food Facts", "source_url": url,
-            "name": product.get("product_name"), "brand": product.get("brands"),
-            "category": category, "description": product.get("generic_name") or product.get("categories"),
-            "image_urls": image_urls, "attributes": attributes, "raw": data,
-            "success": True, "error": None,
+            "upc": upc,
+            "source": "Open Food Facts",
+            "source_url": url,
+            "name": product.get("product_name"),
+            "brand": product.get("brands"),
+            "category": category,
+            "description": product.get("generic_name") or product.get("categories"),
+            "image_urls": image_urls,
+            "attributes": attributes,
+            "raw": data,
+            "success": True,
+            "error": None,
         }
 
     async def _upcitemdb(self, upc: str) -> Dict[str, Any]:
@@ -719,16 +644,32 @@ class UPCScraper:
         image_urls = [u for u in item.get("images", []) if _is_valid_image_url(u)]
 
         attributes = {}
-        for key in ["color", "size", "weight", "description", "lowest_recorded_price", "highest_recorded_price", "model", "title"]:
+        for key in [
+            "color",
+            "size",
+            "weight",
+            "description",
+            "lowest_recorded_price",
+            "highest_recorded_price",
+            "model",
+            "title",
+        ]:
             if item.get(key):
                 attributes[key] = item[key]
 
         return {
-            "upc": upc, "source": "UPCItemDB", "source_url": url,
-            "name": item.get("title"), "brand": item.get("brand"),
-            "category": item.get("category"), "description": item.get("description"),
-            "image_urls": image_urls, "attributes": attributes, "raw": data,
-            "success": True, "error": None,
+            "upc": upc,
+            "source": "UPCItemDB",
+            "source_url": url,
+            "name": item.get("title"),
+            "brand": item.get("brand"),
+            "category": item.get("category"),
+            "description": item.get("description"),
+            "image_urls": image_urls,
+            "attributes": attributes,
+            "raw": data,
+            "success": True,
+            "error": None,
         }
 
     async def _barcode_lookup(self, upc: str) -> Dict[str, Any]:
@@ -774,11 +715,18 @@ class UPCScraper:
             return self._fail("BarcodeLookup", url, {}, "Product not found")
 
         return {
-            "upc": upc, "source": "BarcodeLookup", "source_url": url,
-            "name": name, "brand": brand, "category": None,
-            "description": description, "image_urls": image_urls,
-            "attributes": attributes, "raw": {"html_snippet": soup.get_text()[:500]},
-            "success": True, "error": None,
+            "upc": upc,
+            "source": "BarcodeLookup",
+            "source_url": url,
+            "name": name,
+            "brand": brand,
+            "category": None,
+            "description": description,
+            "image_urls": image_urls,
+            "attributes": attributes,
+            "raw": {"html_snippet": soup.get_text()[:500]},
+            "success": True,
+            "error": None,
         }
 
     async def _go_upc(self, upc: str) -> Dict[str, Any]:
@@ -811,11 +759,18 @@ class UPCScraper:
             return self._fail("Go-UPC", url, {}, "Product not found")
 
         return {
-            "upc": upc, "source": "Go-UPC", "source_url": url,
-            "name": name, "brand": brand, "category": None,
-            "description": description, "image_urls": image_urls,
-            "attributes": {}, "raw": {"html_snippet": soup.get_text()[:500]},
-            "success": True, "error": None,
+            "upc": upc,
+            "source": "Go-UPC",
+            "source_url": url,
+            "name": name,
+            "brand": brand,
+            "category": None,
+            "description": description,
+            "image_urls": image_urls,
+            "attributes": {},
+            "raw": {"html_snippet": soup.get_text()[:500]},
+            "success": True,
+            "error": None,
         }
 
     async def _buycott(self, upc: str) -> Dict[str, Any]:
@@ -850,11 +805,18 @@ class UPCScraper:
             return self._fail("Buycott", url, {}, "Product not found")
 
         return {
-            "upc": upc, "source": "Buycott", "source_url": url,
-            "name": name, "brand": brand, "category": None,
-            "description": description, "image_urls": image_urls,
-            "attributes": {}, "raw": {"html_snippet": soup.get_text()[:500]},
-            "success": True, "error": None,
+            "upc": upc,
+            "source": "Buycott",
+            "source_url": url,
+            "name": name,
+            "brand": brand,
+            "category": None,
+            "description": description,
+            "image_urls": image_urls,
+            "attributes": {},
+            "raw": {"html_snippet": soup.get_text()[:500]},
+            "success": True,
+            "error": None,
         }
 
     async def _eandata(self, upc: str) -> Dict[str, Any]:
@@ -883,11 +845,18 @@ class UPCScraper:
             return self._fail("EANdata", url, {}, "Product not found")
 
         return {
-            "upc": upc, "source": "EANdata", "source_url": url,
-            "name": name, "brand": brand, "category": None,
-            "description": None, "image_urls": [],
-            "attributes": attributes, "raw": {"html_snippet": soup.get_text()[:500]},
-            "success": True, "error": None,
+            "upc": upc,
+            "source": "EANdata",
+            "source_url": url,
+            "name": name,
+            "brand": brand,
+            "category": None,
+            "description": None,
+            "image_urls": [],
+            "attributes": attributes,
+            "raw": {"html_snippet": soup.get_text()[:500]},
+            "success": True,
+            "error": None,
         }
 
     async def _lookify(self, upc: str) -> Dict[str, Any]:
@@ -916,11 +885,18 @@ class UPCScraper:
             return self._fail("Lookify", url, {}, "Product not found")
 
         return {
-            "upc": upc, "source": "Lookify", "source_url": url,
-            "name": name, "brand": brand, "category": None,
-            "description": None, "image_urls": image_urls,
-            "attributes": {}, "raw": {"html_snippet": soup.get_text()[:500]},
-            "success": True, "error": None,
+            "upc": upc,
+            "source": "Lookify",
+            "source_url": url,
+            "name": name,
+            "brand": brand,
+            "category": None,
+            "description": None,
+            "image_urls": image_urls,
+            "attributes": {},
+            "raw": {"html_snippet": soup.get_text()[:500]},
+            "success": True,
+            "error": None,
         }
 
     async def _upcdatabase(self, upc: str) -> Dict[str, Any]:
@@ -952,11 +928,18 @@ class UPCScraper:
             return self._fail("UPCDatabase", url, {}, "Product not found")
 
         return {
-            "upc": upc, "source": "UPCDatabase", "source_url": url,
-            "name": name, "brand": brand, "category": None,
-            "description": None, "image_urls": [],
-            "attributes": attributes, "raw": {"html_snippet": soup.get_text()[:500]},
-            "success": True, "error": None,
+            "upc": upc,
+            "source": "UPCDatabase",
+            "source_url": url,
+            "name": name,
+            "brand": brand,
+            "category": None,
+            "description": None,
+            "image_urls": [],
+            "attributes": attributes,
+            "raw": {"html_snippet": soup.get_text()[:500]},
+            "success": True,
+            "error": None,
         }
 
     async def _brave_search(self, upc: str) -> Dict[str, Any]:
@@ -972,11 +955,18 @@ class UPCScraper:
                 return self._fail("Brave Search", url, data, "No results")
             top = results[0]
             return {
-                "upc": upc, "source": "Brave Search", "source_url": top.get("url"),
-                "name": top.get("title", ""), "brand": None, "category": None,
-                "description": top.get("description", ""), "image_urls": [],
-                "attributes": {"search_results": len(results)}, "raw": data,
-                "success": True, "error": None,
+                "upc": upc,
+                "source": "Brave Search",
+                "source_url": top.get("url"),
+                "name": top.get("title", ""),
+                "brand": None,
+                "category": None,
+                "description": top.get("description", ""),
+                "image_urls": [],
+                "attributes": {"search_results": len(results)},
+                "raw": data,
+                "success": True,
+                "error": None,
             }
         else:
             url = f"https://search.brave.com/search?q={upc}"
@@ -998,11 +988,18 @@ class UPCScraper:
             if not name:
                 return self._fail("Brave Search", url, {}, "No results")
             return {
-                "upc": upc, "source": "Brave Search", "source_url": result_url or url,
-                "name": name, "brand": None, "category": None,
-                "description": description, "image_urls": [],
-                "attributes": {}, "raw": {"html_snippet": soup.get_text()[:500]},
-                "success": True, "error": None,
+                "upc": upc,
+                "source": "Brave Search",
+                "source_url": result_url or url,
+                "name": name,
+                "brand": None,
+                "category": None,
+                "description": description,
+                "image_urls": [],
+                "attributes": {},
+                "raw": {"html_snippet": soup.get_text()[:500]},
+                "success": True,
+                "error": None,
             }
 
     async def _google_search(self, upc: str) -> Dict[str, Any]:
@@ -1018,11 +1015,18 @@ class UPCScraper:
                 return self._fail("Google Search", url, data, "No results")
             top = items[0]
             return {
-                "upc": upc, "source": "Google Search", "source_url": top.get("link"),
-                "name": top.get("title", ""), "brand": None, "category": None,
-                "description": top.get("snippet", ""), "image_urls": [],
-                "attributes": {"search_results": len(items)}, "raw": data,
-                "success": True, "error": None,
+                "upc": upc,
+                "source": "Google Search",
+                "source_url": top.get("link"),
+                "name": top.get("title", ""),
+                "brand": None,
+                "category": None,
+                "description": top.get("snippet", ""),
+                "image_urls": [],
+                "attributes": {"search_results": len(items)},
+                "raw": data,
+                "success": True,
+                "error": None,
             }
         else:
             url = f"https://www.google.com/search?q={upc}"
@@ -1043,19 +1047,43 @@ class UPCScraper:
             if not name:
                 return self._fail("Google Search", url, {}, "No results")
             return {
-                "upc": upc, "source": "Google Search", "source_url": url,
-                "name": name, "brand": None, "category": None,
-                "description": description, "image_urls": [],
-                "attributes": {}, "raw": {"html_snippet": soup.get_text()[:500]},
-                "success": True, "error": None,
+                "upc": upc,
+                "source": "Google Search",
+                "source_url": url,
+                "name": name,
+                "brand": None,
+                "category": None,
+                "description": description,
+                "image_urls": [],
+                "attributes": {},
+                "raw": {"html_snippet": soup.get_text()[:500]},
+                "success": True,
+                "error": None,
             }
 
+    def _get_demo_fallback(self, upc: str) -> Optional[Dict[str, Any]]:
+        demo = DEMO_FALLBACK_DATA.get(upc)
+        if not demo:
+            return None
+        result = dict(demo)
+        result["upc"] = upc
+        result["success"] = True
+        result["error"] = None
+        return result
 
     @staticmethod
     def _fail(source: str, url: str, raw: dict, error: str) -> Dict[str, Any]:
         return {
-            "upc": None, "source": source, "source_url": url,
-            "name": None, "brand": None, "category": None,
-            "description": None, "image_urls": [], "attributes": {},
-            "raw": raw, "success": False, "error": error,
+            "upc": None,
+            "source": source,
+            "source_url": url,
+            "name": None,
+            "brand": None,
+            "category": None,
+            "description": None,
+            "image_urls": [],
+            "attributes": {},
+            "raw": raw,
+            "success": False,
+            "error": error,
         }

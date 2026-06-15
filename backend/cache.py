@@ -4,10 +4,10 @@ In-memory LRU + TTL cache for UPC lookups and HTTP responses.
 Uses a simple dict with expiration timestamps.
 """
 
-import time
 import threading
-from typing import Optional, Dict, Any
+import time
 from collections import OrderedDict
+from typing import Any, Dict, Optional
 
 DEFAULT_TTL = 300  # 5 minutes
 DEFAULT_MAX_SIZE = 1000

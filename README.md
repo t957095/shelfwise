@@ -1,4 +1,4 @@
-# ShelfWise - AI Product Portfolio Builder
+# ShelfWise: AI Product Portfolio Builder for Small Businesses
 
 [![Python 3.14](https://img.shields.io/badge/python-3.14-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
@@ -7,26 +7,33 @@
 
 > **Agents League Hackathon 2026 - Reasoning Agents Track**
 > Microsoft Foundry | Foundry IQ | Azure OpenAI
+>
+> Turn a spreadsheet of UPCs and SKUs into a complete, market-ready product catalog with verified photos, titles, and descriptions powered by multi-step reasoning and Microsoft Foundry IQ.
 
 ---
 
 ## The Problem
 
-Small businesses that buy liquidation pallets, wholesale lots, or estate sales often receive hundreds or thousands of items with nothing but a UPC barcode. Turning those barcodes into e-commerce-ready listings is a manual, soul-crushing process. Most owners give up and sell bulk-only, leaving 30-40% of potential revenue on the table.
+When someone buys a pallet of inventory, they often receive hundreds of products with nothing but UPC barcodes or internal SKUs on the packaging. Before they can sell anything online, they have to figure out what each item is — searching Google, checking marketplaces, comparing listings, finding product photos, copying specifications, and writing descriptions.
 
-This is not a hypothetical. Walk through any liquidation warehouse and you will see pallets sitting for months because nobody has time to look up each item, write descriptions, find images, and format listings for Shopify, Amazon, or eBay.
+At around 8 minutes per item, a pallet with 400 products can require more than 50 hours of manual work before anything is listed for sale. For many small businesses, that work never gets done. Inventory sits in storage instead of generating revenue.
 
 ## The Solution
 
-ShelfWise transforms a list of UPC codes into a complete, exportable product portfolio in minutes. It scrapes 8+ public data sources concurrently, runs a multi-step reasoning agent to consolidate conflicting information, generates cited product records, and exports directly to Shopify, Amazon, or generic CSV/JSON.
+ShelfWise turns a spreadsheet of UPCs and SKUs into a complete, market-ready product catalog. Users upload a CSV or paste identifiers directly into the app. The system searches across the web — retailer listings, manufacturer pages, marketplaces, specialty stores, distributor catalogs, and public product databases — to gather evidence for each product.
+
+A multi-step reasoning agent resolves conflicting names, deduplicates evidence, scores source reliability, and builds a cited product record. Verified images are ranked into a gallery of up to 5 marketplace-ready photos. The final catalog exports to Shopify, Amazon Seller Central, eBay, Facebook Marketplace, WooCommerce, Etsy, BigCommerce, DoorDash, Uber Eats, Grubhub, or generic CSV/JSON.
 
 **Key capabilities:**
-- **8 concurrent scrapers** - Open Food Facts, UPCItemDB, BarcodeLookup, Go-UPC, Buycott, EANdata, Brave Search, Google Search
-- **Multi-step reasoning agent** - Jaccard deduplication, source-weighted field resolution, confidence scoring
-- **Foundry IQ integration** - Optional Azure OpenAI enrichment with JSON-structured responses and full citation trails
-- **Real-time SSE streaming** - Watch each UPC get processed live with progress bars
-- **4 export formats** - CSV, JSON, Shopify product import, Amazon flat file
-- **Accessibility-first** - WCAG 2.1 AA compliant, keyboard navigation, screen reader support, reduced motion support
+- **Web-wide evidence gathering** — 10 core sources plus a registry of 270+ additional sources, queried concurrently. Searches the broader web, not just a fixed UPC catalog.
+- **Multi-step reasoning agent** — Jaccard deduplication, weighted brand/category resolution, attribute normalization, confidence scoring, and grounded citations.
+- **Verified product imagery** — Downloads and scores every candidate photo for white/clean backgrounds, resolution, central product focus, sharpness, frame fill, and source validity, then returns a ranked gallery of up to 5 verified multi-angle photos per product.
+- **Name-based image search fallback** — When a barcode has no public match, ShelfWise searches the web by product name/brand and verifies those images.
+- **Manual upload & review** — Users can delete auto-selected images or upload their own through the image manager on each product card.
+- **Foundry IQ integration** — Optional Azure OpenAI enrichment with JSON-structured responses and full citation trails.
+- **Real-time SSE streaming** — Watch each UPC get processed live with progress bars.
+- **11 export formats** — CSV, JSON, Shopify, Amazon, WooCommerce, eBay, Etsy, BigCommerce, DoorDash, Uber Eats, Grubhub.
+- **Accessibility-first** — WCAG 2.1 AA compliant, keyboard navigation, screen reader support, reduced motion support.
 
 ## Demo Video
 
@@ -40,18 +47,20 @@ Open `architecture.html` in a browser to view the full interactive architecture 
 
 ### Data Flow
 
-1. **Input** - User uploads CSV or enters UPCs manually
-2. **Scraping** - 8 sources queried concurrently with rotating user-agents and retry logic
-3. **Reasoning** - ProductReasoningAgent weights sources, deduplicates names, resolves fields, merges attributes
-4. **Foundry IQ** - If Azure OpenAI credentials are configured, the agent sends raw data for LLM-based enrichment
-5. **Storage** - SQLite database tracks jobs and stores consolidated products
-6. **Output** - Live SSE updates to frontend, product cards with images/citations, multi-format export
+1. **Input** - User uploads a CSV or enters UPCs/SKUs manually
+2. **Scraping** - Core sources and top-weighted registry sources queried concurrently with rotating user-agents, retry logic, circuit breakers, and health tracking
+3. **Name-Based Image Search Fallback** - When no public UPC match exists, the system searches the web by product name/brand
+4. **Reasoning** - ProductReasoningAgent weights sources, deduplicates names, resolves fields, merges attributes, and generates citations
+5. **Image Verification** - Candidate photos are scored for white/clean backgrounds, quality, focus, sharpness, frame fill, source validity, and perceptual diversity; a ranked gallery of up to 5 verified multi-angle images is selected per product
+6. **Foundry IQ** - If Azure OpenAI credentials are configured, the agent sends raw data for LLM-based enrichment
+7. **Storage** - SQLite database tracks jobs and stores consolidated products
+8. **Output** - Live SSE updates to frontend, product cards with verified images/citations, manual upload/review, multi-format export
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Backend | Python 3.14, FastAPI, Uvicorn |
+| Backend | Python 3.12, FastAPI, Uvicorn |
 | Scraping | httpx, BeautifulSoup4, async concurrency |
 | Reasoning | Custom multi-step agent with Jaccard similarity |
 | AI/LLM | Azure OpenAI GPT-4.1-mini (optional) |
@@ -65,7 +74,7 @@ Open `architecture.html` in a browser to view the full interactive architecture 
 
 ```bash
 # Clone the repo
-git clone https://github.com/yourusername/shelfwise.git
+git clone https://github.com/t957095/shelfwise.git
 cd shelfwise
 
 # Create virtual environment
@@ -128,9 +137,12 @@ GOOGLE_CX=your-programmable-search-engine-id
 | `/api/health` | GET | Health check with feature flags |
 | `/api/demo` | GET | Load 3 demo UPCs |
 | `/api/batch` | POST | Submit UPCs for processing |
-| `/api/upload-csv` | POST | Upload CSV with 'upc' column |
+| `/api/upload-csv` | POST | Upload POS CSV; auto-detects UPC/EAN/SKU/PLU, accepts `max_rows` query param |
+| `/api/upload-csv/preview` | POST | Preview a POS CSV: detected columns and sample UPCs |
 | `/api/products` | GET | List all products |
 | `/api/products/{upc}` | GET | Get single product |
+| `/api/products/{upc}/images` | POST | Upload a product image |
+| `/api/products/{upc}/images` | DELETE | Remove a product image by URL |
 | `/api/export` | POST | Export as csv/json/shopify/amazon |
 | `/api/jobs/{job_id}` | GET | Get job status |
 | `/api/jobs/{job_id}/stream` | GET | SSE stream of live updates |
@@ -188,8 +200,9 @@ shelfwise/
 │   ├── main.py              # FastAPI app with SSE streaming
 │   ├── models.py            # Pydantic data models
 │   ├── database.py          # SQLite layer
-│   ├── scraper.py           # 8-source async scraper
+│   ├── scraper.py           # Async scraper with 270+ source registry
 │   ├── foundry_agent.py     # Multi-step reasoning agent + Azure OpenAI
+│   ├── image_verifier.py    # Verified product photo pipeline
 │   ├── setup-azure-openai.ps1  # One-click Azure provisioning
 │   └── .env.example         # Environment template
 ├── frontend/
@@ -207,7 +220,7 @@ shelfwise/
 
 - **Track:** Reasoning Agents (Microsoft Foundry)
 - **IQ Layer:** Foundry IQ (agentic knowledge retrieval + citation generation)
-- **Repository:** https://github.com/yourusername/shelfwise *(replace with your repo)*
+- **Repository:** https://github.com/t957095/shelfwise
 - **Demo Video:** [YouTube link](https://youtube.com/your-demo-link)
 - **Architecture Diagram:** Open `architecture.html`
 
