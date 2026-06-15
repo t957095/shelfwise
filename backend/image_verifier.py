@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
 import httpx
-from PIL import Image, ImageStat
+from PIL import Image, ImageFilter, ImageStat
 
 try:
     from openai import AsyncOpenAI
@@ -40,6 +40,11 @@ MAX_ASPECT_RATIO = 3.0  # width / height
 # Background scoring thresholds
 WHITE_BG_THRESHOLD = 240  # 0-255; corner pixels must average above this
 CLEAN_EDGE_RATIO = 0.75  # fraction of edge pixels that must be near-white
+
+# Verification thresholds for a marketplace-ready hero image
+HERO_MIN_OVERALL_SCORE = 0.60
+HERO_MIN_WHITE_BG_SCORE = 0.55
+HERO_MIN_QUALITY_SCORE = 0.40
 
 
 def _is_valid_image_url(url: str) -> bool:
@@ -66,6 +71,13 @@ async def _download_image(client: httpx.AsyncClient, url: str, timeout: float = 
         img = Image.open(io.BytesIO(content))
         img.load()  # force load so we can close the bytes buffer
         if img.mode in ("RGBA", "P"):
+            # Composite onto white so transparent PNGs are scored fairly
+            bg = Image.new("RGB", img.size, (255, 255, 255))
+            if img.mode == "P":
+                img = img.convert("RGBA")
+            bg.paste(img, mask=img.split()[3])
+            img = bg
+        elif img.mode != "RGB":
             img = img.convert("RGB")
         return img
     except Exception as e:
@@ -169,6 +181,59 @@ def _focus_score(img: Image.Image) -> float:
     return round(max(0.0, score), 3)
 
 
+def _center_fill_score(img: Image.Image) -> float:
+    """Estimate how much of the center frame is occupied by the product.
+
+    Marketplace hero shots usually show the product filling 50-85% of the frame
+    with a clean border. This heuristic compares edge brightness to center
+    brightness: a dark/colored product on a white background yields a strong
+    contrast and a high fill score.
+    """
+    width, height = img.size
+    if width < 40 or height < 40:
+        return 0.0
+
+    gray = img.convert("L")
+    # Center 60% region
+    center = gray.crop((width * 0.2, height * 0.2, width * 0.8, height * 0.8))
+    # Outer 20% border
+    outer = gray.crop((width * 0.1, height * 0.1, width * 0.9, height * 0.9))
+
+    center_mean = ImageStat.Stat(center).mean[0]
+    outer_mean = ImageStat.Stat(outer).mean[0]
+
+    # Normalize by overall brightness to avoid bias on dark products
+    overall_mean = ImageStat.Stat(gray).mean[0]
+    if overall_mean == 0:
+        return 0.0
+
+    # We want the center to be darker / more saturated than the white border.
+    # Compute the relative drop from border to center.
+    border_brightness = outer_mean / 255.0
+    center_brightness = center_mean / 255.0
+    contrast = max(0.0, border_brightness - center_brightness)
+
+    # Reward moderate contrast; too little means empty/white image, too much
+    # could mean a cropped frame. Ideal hero shot contrast is roughly 0.25-0.65.
+    score = 1.0 - abs(contrast - 0.45) / 0.45
+    return round(max(0.0, min(1.0, score)), 3)
+
+
+def _sharpness_score(img: Image.Image) -> float:
+    """Estimate sharpness using a simple Laplacian-style variance measure."""
+    try:
+        gray = img.convert("L")
+        # Slight blur to reduce noise, then edge filter
+        edges = gray.filter(ImageFilter.FIND_EDGES)
+        stat = ImageStat.Stat(edges)
+        variance = stat.var[0]
+        # Normalize: variance above 500 is considered sharp
+        score = min(variance / 500.0, 1.0)
+        return round(score, 3)
+    except Exception:
+        return 0.0
+
+
 def _image_hash(img: Image.Image, hash_size: int = 8) -> str:
     """Compute a simple perceptual hash for deduplication."""
     gray = img.convert("L")
@@ -205,6 +270,8 @@ class VerifiedImageResult:
         white_bg_score: float,
         quality_score: float,
         focus_score: float,
+        center_fill_score: float,
+        sharpness_score: float,
         phash: str,
         width: int,
         height: int,
@@ -215,11 +282,20 @@ class VerifiedImageResult:
         self.white_bg_score = white_bg_score
         self.quality_score = quality_score
         self.focus_score = focus_score
+        self.center_fill_score = center_fill_score
+        self.sharpness_score = sharpness_score
         self.phash = phash
         self.width = width
         self.height = height
         self.content_type = content_type
-        self.overall_score = round(0.45 * white_bg_score + 0.30 * quality_score + 0.25 * focus_score, 3)
+        self.overall_score = round(
+            0.35 * white_bg_score
+            + 0.25 * quality_score
+            + 0.20 * focus_score
+            + 0.12 * center_fill_score
+            + 0.08 * sharpness_score,
+            3,
+        )
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -229,10 +305,22 @@ class VerifiedImageResult:
             "white_background_score": self.white_bg_score,
             "quality_score": self.quality_score,
             "focus_score": self.focus_score,
+            "center_fill_score": self.center_fill_score,
+            "sharpness_score": self.sharpness_score,
             "width": self.width,
             "height": self.height,
             "verified": self.is_verified(),
         }
+
+    def is_hero(self) -> bool:
+        """Return True if this image is suitable as the single product hero shot."""
+        return (
+            self.overall_score >= HERO_MIN_OVERALL_SCORE
+            and self.white_bg_score >= HERO_MIN_WHITE_BG_SCORE
+            and self.quality_score >= HERO_MIN_QUALITY_SCORE
+            and self.width >= MIN_WIDTH
+            and self.height >= MIN_HEIGHT
+        )
 
     def is_verified(self, threshold: float = 0.55) -> bool:
         return self.overall_score >= threshold and self.quality_score > 0.0
@@ -277,6 +365,18 @@ class ProductImageVerifier:
 
         return deduped
 
+    async def select_hero_image(
+        self,
+        candidates: List[Dict[str, Any]],
+        product_name: Optional[str] = None,
+        product_brand: Optional[str] = None,
+    ) -> Optional[VerifiedImageResult]:
+        """Return the single best hero image, or None if none passes the hero bar."""
+        verified = await self.verify_images(candidates, product_name, product_brand)
+        heroes = [v for v in verified if v.is_hero()]
+        heroes.sort(key=lambda x: x.overall_score, reverse=True)
+        return heroes[0] if heroes else None
+
     async def _verify_one(self, url: str, source: str) -> Optional[VerifiedImageResult]:
         img = await _download_image(self.client, url)
         if img is None:
@@ -285,6 +385,8 @@ class ProductImageVerifier:
             white = _white_background_score(img)
             quality = _quality_score(img)
             focus = _focus_score(img)
+            center_fill = _center_fill_score(img)
+            sharpness = _sharpness_score(img)
             phash = _image_hash(img)
             return VerifiedImageResult(
                 url=url,
@@ -292,6 +394,8 @@ class ProductImageVerifier:
                 white_bg_score=white,
                 quality_score=quality,
                 focus_score=focus,
+                center_fill_score=center_fill,
+                sharpness_score=sharpness,
                 phash=phash,
                 width=img.width,
                 height=img.height,
@@ -373,5 +477,40 @@ async def select_verified_images(
         images = [v.to_dict() for v in top]
         best_url = top[0].url if top else None
         return images, best_url
+    finally:
+        await verifier.close()
+
+
+async def select_hero_image(
+    candidates: List[Dict[str, Any]],
+    product_name: Optional[str] = None,
+    product_brand: Optional[str] = None,
+    client: Optional[httpx.AsyncClient] = None,
+) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """Convenience function: return exactly one hero image dict and its URL.
+
+    This is the preferred entry point for ShelfWise: every product gets a single,
+    verified, marketplace-ready hero photo. If no candidate passes the hero bar,
+    the best verified image is still returned so the UI never shows a placeholder
+    when a usable photo exists.
+    """
+    verifier = ProductImageVerifier(client=client)
+    try:
+        hero = await verifier.select_hero_image(candidates, product_name, product_brand)
+        if hero:
+            return hero.to_dict(), hero.url
+
+        # Fallback: return the single best verified image
+        verified = await verifier.verify_images(candidates, product_name, product_brand)
+        verified = [v for v in verified if v.is_verified()]
+        if not verified:
+            # Last resort: return the highest-scoring candidate even if unverified
+            all_scored = await verifier.verify_images(candidates, product_name, product_brand)
+            if all_scored:
+                best = max(all_scored, key=lambda x: x.overall_score)
+                return best.to_dict(), best.url
+            return None, None
+        best = max(verified, key=lambda x: x.overall_score)
+        return best.to_dict(), best.url
     finally:
         await verifier.close()

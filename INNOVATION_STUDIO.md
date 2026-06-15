@@ -13,25 +13,27 @@ At the center of ShelfWise is a reasoning agent that mirrors Foundry IQ patterns
 - **Grounded citations** — every field in the consolidated record carries a citation with source URL, fields contributed, and confidence score, producing an auditable evidence trail.
 - **LLM enrichment fallback** — when `FOUNDRY_ENDPOINT` and `FOUNDRY_API_KEY` are configured, the agent sends raw evidence to Azure OpenAI GPT-4.1-mini for advanced consolidation; when unavailable, a deterministic local engine produces complete results with no external dependency.
 
-## Verified Product Imagery
+## Verified Product Imagery — One Hero Photo Per Product
 
 ShelfWise does not return random product photos. A dedicated **image verification pipeline** downloads candidate images and scores them on:
 
 - **White / clean background** — samples edge pixels to detect near-white backgrounds typical of marketplace listings.
 - **Image quality** — resolution and aspect-ratio checks filter out thumbnails and banners.
 - **Central product focus** — edge-density analysis favors images where the product is centered and in focus.
-- **Deduplication** — perceptual hashing removes near-duplicate photos and keeps a diverse set of verified angles.
+- **Center fill** — rewards product shots where the item fills the frame with a clean border, penalizing empty frames or tightly cropped logos.
+- **Sharpness** — edge-variance filtering rejects blurry or over-compressed photos.
+- **Deduplication** — perceptual hashing removes near-duplicate photos.
 
-Only images that pass verification are surfaced as the product's gallery, with the best photo selected as the primary image.
+The pipeline selects **exactly one verified hero image** per product: the single best marketplace-ready photo. No noisy galleries, no placeholder clutter — just one clean, consistent product shot that works across Shopify, Amazon, DoorDash, Uber Eats, and Grubhub.
 
 ## End-to-End Workflow
 
 1. A user uploads a CSV or pastes UPCs.
 2. The scraper collects structured and unstructured evidence from dozens of sources in parallel.
 3. The reasoning agent weights, deduplicates, and resolves the evidence into a single consolidated record.
-4. Verified images are selected and ranked.
+4. A single verified hero image is selected and ranked.
 5. The record is stored in SQLite, streamed to the frontend via SSE, and exported to the marketplace format of choice — including native formats for food-delivery platforms.
 
 ## Why It Matters
 
-Restaurants, ghost kitchens, and convenience stores that list on DoorDash, Uber Eats, or Grubhub often receive CSV files from their POS system with hundreds of UPCs and no photos. Manually researching each item — finding the right name, description, and clean photo — is too slow, so menus and catalogs stay incomplete. ShelfWise automates the research, produces trustworthy, cited listings with verified imagery, and exports directly to the delivery platform's format — turning a POS export into a complete online catalog in minutes.
+Restaurants, ghost kitchens, and convenience stores that list on DoorDash, Uber Eats, or Grubhub often receive CSV files from their POS system with hundreds of UPCs and no photos. Manually researching each item — finding the right name, description, and clean photo — is too slow, so menus and catalogs stay incomplete. ShelfWise automates the research, produces trustworthy, cited listings with one verified product photo each, and exports directly to the delivery platform's format — turning a POS export into a complete online catalog in minutes.
