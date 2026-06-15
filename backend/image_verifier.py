@@ -86,7 +86,11 @@ async def _download_image(client: httpx.AsyncClient, url: str, timeout: float = 
         if content_type is not None:
             content_type = str(content_type.get("content-type", "")).lower()
             # Only reject if we have a clear non-image content type
-            if content_type and "/" in content_type and not any(t in content_type for t in ("image/", "application/octet-stream")):
+            if (
+                content_type
+                and "/" in content_type
+                and not any(t in content_type for t in ("image/", "application/octet-stream"))
+            ):
                 logger.debug(f"Rejecting non-image content-type {content_type} for {url}")
                 return None
         content = response.content
@@ -561,22 +565,16 @@ async def select_hero_image(
     """
     verifier = ProductImageVerifier(client=client)
     try:
-        hero = await verifier.select_hero_image(
-            candidates, product_name, product_brand, marketplace=marketplace
-        )
+        hero = await verifier.select_hero_image(candidates, product_name, product_brand, marketplace=marketplace)
         if hero:
             return hero.to_dict(), hero.url
 
         # Fallback: return the single best verified image
-        verified = await verifier.verify_images(
-            candidates, product_name, product_brand, marketplace=marketplace
-        )
+        verified = await verifier.verify_images(candidates, product_name, product_brand, marketplace=marketplace)
         verified = [v for v in verified if v.is_verified()]
         if not verified:
             # Last resort: return the highest-scoring candidate even if unverified
-            all_scored = await verifier.verify_images(
-                candidates, product_name, product_brand, marketplace=marketplace
-            )
+            all_scored = await verifier.verify_images(candidates, product_name, product_brand, marketplace=marketplace)
             if all_scored:
                 best = max(all_scored, key=lambda x: x.overall_score)
                 return best.to_dict(), best.url

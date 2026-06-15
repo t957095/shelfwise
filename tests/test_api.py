@@ -1,4 +1,7 @@
+import io
+
 from fastapi.testclient import TestClient
+from PIL import Image
 
 from backend.database import delete_all_products, upsert_product
 from backend.main import app
@@ -183,3 +186,68 @@ def test_export_csv_filtered():
     text = response.text
     assert "Alpha Product" in text
     assert "Beta Product" not in text
+
+
+def _seed_single_product():
+    delete_all_products()
+    upsert_product(
+        ConsolidatedProduct(
+            upc="333333333333",
+            name="Gamma Product",
+            brand="GammaBrand",
+            category="Beverages",
+            description="Gamma desc",
+            confidence=0.95,
+            status="complete",
+        )
+    )
+
+
+def _make_image_bytes() -> bytes:
+    img = Image.new("RGB", (100, 100), color="red")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def test_upload_product_image():
+    """Test uploading an image for a product."""
+    _seed_single_product()
+    response = client.post(
+        "/api/products/333333333333/images",
+        files={"file": ("test.png", io.BytesIO(_make_image_bytes()), "image/png")},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["upc"] == "333333333333"
+    assert data["image_url"].startswith("/uploads/")
+    assert len(data["images"]) == 1
+
+
+def test_upload_product_image_invalid_type():
+    """Test uploading a non-image file is rejected."""
+    _seed_single_product()
+    response = client.post(
+        "/api/products/333333333333/images",
+        files={"file": ("test.txt", io.BytesIO(b"not an image"), "text/plain")},
+    )
+    assert response.status_code == 400
+
+
+def test_delete_product_image():
+    """Test deleting an uploaded product image."""
+    _seed_single_product()
+    upload_response = client.post(
+        "/api/products/333333333333/images",
+        files={"file": ("test.png", io.BytesIO(_make_image_bytes()), "image/png")},
+    )
+    image_url = upload_response.json()["image_url"]
+
+    delete_response = client.delete(
+        "/api/products/333333333333/images",
+        params={"url": image_url},
+    )
+    assert delete_response.status_code == 200
+    data = delete_response.json()
+    assert len(data["images"]) == 0
+    assert data["image_url"] is None

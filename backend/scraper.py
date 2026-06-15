@@ -103,6 +103,7 @@ class ScraperHealth:
         successes = self._successes.get(source, 0)
         return successes / calls if calls else 1.0
 
+
 # Demo fallback data for hackathon demo
 DEMO_FALLBACK_DATA = {
     "049000050103": {
@@ -571,7 +572,7 @@ class UPCScraper:
             return result
         except Exception as e:
             elapsed = time.time() - start
-            logger.warning(f"Scraper {name} failed for {upc} ({elapsed*1000:.1f}ms): {e}")
+            logger.warning(f"Scraper {name} failed for {upc} ({elapsed * 1000:.1f}ms): {e}")
             await self.health.record(name, False, elapsed)
             return {
                 "upc": upc,

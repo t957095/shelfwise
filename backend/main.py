@@ -5,7 +5,9 @@ AI Product Portfolio Builder for Small Businesses.
 """
 
 import os
+import shutil
 import sys
+import uuid
 from pathlib import Path
 
 _project_root = Path(__file__).parent.parent
@@ -26,7 +28,7 @@ from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional
 
 import httpx
-from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Path, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -109,6 +111,11 @@ app.add_middleware(
 
 frontend_path = os.path.join(os.path.dirname(__file__), "..", "frontend")
 app.mount("/app", StaticFiles(directory=frontend_path, html=True), name="frontend")
+
+# Uploaded product images
+uploads_dir = os.path.join(os.path.dirname(__file__), "uploads")
+os.makedirs(uploads_dir, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
 
 def get_scraper() -> UPCScraper:
@@ -634,6 +641,85 @@ async def get_single_product(upc: str):
         raise HTTPException(status_code=500, detail="Error parsing product data")
 
 
+@app.post("/api/products/{upc}/images")
+async def upload_product_image(upc: str = Path(...), file: UploadFile = File(...)):
+    """Upload a product image and attach it to the product record."""
+    row = get_product(upc)
+    if not row:
+        raise HTTPException(status_code=404, detail=f"Product not found: {upc}")
+
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in {".jpg", ".jpeg", ".png", ".webp", ".gif"}:
+        ext = ".jpg"
+
+    filename = f"{upc}_{uuid.uuid4().hex}{ext}"
+    filepath = os.path.join(uploads_dir, filename)
+
+    try:
+        with open(filepath, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save image: {e}")
+    finally:
+        await file.close()
+
+    image_url = f"/uploads/{filename}"
+    try:
+        data = json.loads(row["data"])
+        data.setdefault("images", []).append({"url": image_url, "source": "User Upload", "score": 1.0})
+        if not data.get("image_url"):
+            data["image_url"] = image_url
+        product = ConsolidatedProduct(**data)
+        upsert_product(product)
+        upc_cache.set(upc, data)
+        return {"upc": upc, "image_url": image_url, "images": data.get("images", [])}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating product: {e}")
+
+
+@app.delete("/api/products/{upc}/images")
+async def delete_product_image(upc: str = Path(...), url: str = Query(..., description="Image URL to remove")):
+    """Remove an image from a product record."""
+    row = get_product(upc)
+    if not row:
+        raise HTTPException(status_code=404, detail=f"Product not found: {upc}")
+
+    try:
+        data = json.loads(row["data"])
+        images = data.get("images", [])
+        before = len(images)
+        images = [img for img in images if img.get("url") != url]
+        if len(images) == before:
+            raise HTTPException(status_code=404, detail="Image not found on product")
+
+        data["images"] = images
+        # Update primary image if the deleted one was primary
+        if data.get("image_url") == url:
+            data["image_url"] = images[0]["url"] if images else None
+
+        # Optionally delete the physical file for local uploads
+        if url.startswith("/uploads/"):
+            filename = os.path.basename(url)
+            filepath = os.path.join(uploads_dir, filename)
+            try:
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+            except Exception as e:
+                logger.warning(f"Could not delete uploaded file {filepath}: {e}")
+
+        product = ConsolidatedProduct(**data)
+        upsert_product(product)
+        upc_cache.set(upc, data)
+        return {"upc": upc, "image_url": data.get("image_url"), "images": images}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting image: {e}")
+
+
 def _filter_products_for_export(
     products: List[Dict[str, Any]],
     status: Optional[str] = None,
@@ -931,20 +1017,24 @@ async def export_portfolio(request: ExportRequest):
     elif fmt == "etsy":
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(["TITLE", "DESCRIPTION", "PRICE", "CATEGORY", "QUANTITY", "TAGS", "MATERIALS", "IMAGE1"])
+        header = ["TITLE", "DESCRIPTION", "PRICE", "CATEGORY", "QUANTITY", "TAGS", "MATERIALS"]
+        for i in range(1, 6):
+            header.append(f"IMAGE{i}")
+        writer.writerow(header)
         for p in products:
-            writer.writerow(
-                [
-                    p.get("name", ""),
-                    p.get("description", ""),
-                    "",
-                    p.get("category", ""),
-                    "1",
-                    f"upc-{p.get('upc', '')}",
-                    "",
-                    p.get("image_url", ""),
-                ]
-            )
+            image_urls = _get_export_image_urls(p, max_images=5)
+            row = [
+                p.get("name", ""),
+                p.get("description", ""),
+                "",
+                p.get("category", ""),
+                "1",
+                f"upc-{p.get('upc', '')}",
+                "",
+            ]
+            for i in range(5):
+                row.append(image_urls[i] if i < len(image_urls) else "")
+            writer.writerow(row)
         output.seek(0)
         return StreamingResponse(
             io.BytesIO(output.getvalue().encode("utf-8")),
@@ -955,29 +1045,30 @@ async def export_portfolio(request: ExportRequest):
     elif fmt == "bigcommerce":
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(
-            [
-                "Product Name",
-                "Product Type",
-                "Product Code/SKU",
-                "Price",
-                "Category",
-                "Product Description",
-                "Product Image URL - 1",
-            ]
-        )
+        header = [
+            "Product Name",
+            "Product Type",
+            "Product Code/SKU",
+            "Price",
+            "Category",
+            "Product Description",
+        ]
+        for i in range(1, 6):
+            header.append(f"Product Image URL - {i}")
+        writer.writerow(header)
         for p in products:
-            writer.writerow(
-                [
-                    p.get("name", ""),
-                    "Physical",
-                    p.get("upc", ""),
-                    "",
-                    p.get("category", ""),
-                    p.get("description", ""),
-                    p.get("image_url", ""),
-                ]
-            )
+            image_urls = _get_export_image_urls(p, max_images=5)
+            row = [
+                p.get("name", ""),
+                "Physical",
+                p.get("upc", ""),
+                "",
+                p.get("category", ""),
+                p.get("description", ""),
+            ]
+            for i in range(5):
+                row.append(image_urls[i] if i < len(image_urls) else "")
+            writer.writerow(row)
         output.seek(0)
         return StreamingResponse(
             io.BytesIO(output.getvalue().encode("utf-8")),
@@ -988,23 +1079,36 @@ async def export_portfolio(request: ExportRequest):
     elif fmt == "doordash":
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(
-            ["Merchant ID", "Item ID", "Item Name", "Description", "Category", "Price", "Image URL", "UPC", "Status"]
-        )
+        header = [
+            "Merchant ID",
+            "Item ID",
+            "Item Name",
+            "Description",
+            "Category",
+            "Price",
+            "Image URL",
+            "UPC",
+            "Status",
+        ]
+        for i in range(2, 6):
+            header.append(f"Image URL {i}")
+        writer.writerow(header)
         for p in products:
-            writer.writerow(
-                [
-                    "",
-                    p.get("upc", ""),
-                    p.get("name", ""),
-                    p.get("description", ""),
-                    p.get("category", ""),
-                    "",
-                    p.get("image_url", ""),
-                    p.get("upc", ""),
-                    "Active",
-                ]
-            )
+            image_urls = _get_export_image_urls(p, max_images=5)
+            row = [
+                "",
+                p.get("upc", ""),
+                p.get("name", ""),
+                p.get("description", ""),
+                p.get("category", ""),
+                "",
+                image_urls[0] if image_urls else "",
+                p.get("upc", ""),
+                "Active",
+            ]
+            for i in range(1, 5):
+                row.append(image_urls[i] if i < len(image_urls) else "")
+            writer.writerow(row)
         output.seek(0)
         return StreamingResponse(
             io.BytesIO(output.getvalue().encode("utf-8")),
@@ -1015,22 +1119,34 @@ async def export_portfolio(request: ExportRequest):
     elif fmt == "ubereats":
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(
-            ["Menu ID", "Section", "Item Name", "Item Description", "Price", "Image URL", "External ID", "Dietary Tags"]
-        )
+        header = [
+            "Menu ID",
+            "Section",
+            "Item Name",
+            "Item Description",
+            "Price",
+            "Image URL",
+            "External ID",
+            "Dietary Tags",
+        ]
+        for i in range(2, 6):
+            header.append(f"Image URL {i}")
+        writer.writerow(header)
         for p in products:
-            writer.writerow(
-                [
-                    "",
-                    p.get("category", ""),
-                    p.get("name", ""),
-                    p.get("description", ""),
-                    "",
-                    p.get("image_url", ""),
-                    p.get("upc", ""),
-                    "",
-                ]
-            )
+            image_urls = _get_export_image_urls(p, max_images=5)
+            row = [
+                "",
+                p.get("category", ""),
+                p.get("name", ""),
+                p.get("description", ""),
+                "",
+                image_urls[0] if image_urls else "",
+                p.get("upc", ""),
+                "",
+            ]
+            for i in range(1, 5):
+                row.append(image_urls[i] if i < len(image_urls) else "")
+            writer.writerow(row)
         output.seek(0)
         return StreamingResponse(
             io.BytesIO(output.getvalue().encode("utf-8")),
@@ -1041,33 +1157,36 @@ async def export_portfolio(request: ExportRequest):
     elif fmt == "grubhub":
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(
-            [
-                "Restaurant ID",
-                "Menu Item ID",
-                "Item Name",
-                "Description",
-                "Category",
-                "Price",
-                "Image URL",
-                "UPC",
-                "Enabled",
-            ]
-        )
+        header = [
+            "Restaurant ID",
+            "Menu Item ID",
+            "Item Name",
+            "Description",
+            "Category",
+            "Price",
+            "Image URL",
+            "UPC",
+            "Enabled",
+        ]
+        for i in range(2, 6):
+            header.append(f"Image URL {i}")
+        writer.writerow(header)
         for p in products:
-            writer.writerow(
-                [
-                    "",
-                    p.get("upc", ""),
-                    p.get("name", ""),
-                    p.get("description", ""),
-                    p.get("category", ""),
-                    "",
-                    p.get("image_url", ""),
-                    p.get("upc", ""),
-                    "TRUE",
-                ]
-            )
+            image_urls = _get_export_image_urls(p, max_images=5)
+            row = [
+                "",
+                p.get("upc", ""),
+                p.get("name", ""),
+                p.get("description", ""),
+                p.get("category", ""),
+                "",
+                image_urls[0] if image_urls else "",
+                p.get("upc", ""),
+                "TRUE",
+            ]
+            for i in range(1, 5):
+                row.append(image_urls[i] if i < len(image_urls) else "")
+            writer.writerow(row)
         output.seek(0)
         return StreamingResponse(
             io.BytesIO(output.getvalue().encode("utf-8")),
