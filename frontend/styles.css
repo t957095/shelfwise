@@ -418,6 +418,11 @@ select:focus {
     transform: translateY(-2px);
 }
 
+.product-image-shell {
+    position: relative;
+    background: linear-gradient(180deg, #ffffff, #f5f5f7);
+}
+
 .product-image {
     display: block;
     width: 100%;
@@ -434,6 +439,21 @@ select:focus {
     font-size: 0.9rem;
     font-weight: 700;
     letter-spacing: 0.02em;
+}
+
+.image-status-badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
 }
 
 .product-image-thumbnails {

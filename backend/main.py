@@ -8,9 +8,9 @@ import os
 import shutil
 import sys
 import uuid
-from pathlib import Path
+from pathlib import Path as FilePath
 
-_project_root = Path(__file__).parent.parent
+_project_root = FilePath(__file__).parent.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
@@ -20,6 +20,7 @@ load_dotenv(_project_root / ".env")
 
 import asyncio
 import csv
+import html
 import io
 import json
 import logging
@@ -118,6 +119,22 @@ uploads_dir = os.path.join(os.path.dirname(__file__), "uploads")
 os.makedirs(uploads_dir, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
+FALLBACK_IMAGE_COLORS = {
+    "baby care": ("#f5d0fe", "#7e22ce"),
+    "beverages": ("#bfdbfe", "#1d4ed8"),
+    "boxed meals": ("#fed7aa", "#c2410c"),
+    "breakfast": ("#fde68a", "#a16207"),
+    "canned goods": ("#bbf7d0", "#15803d"),
+    "condiments": ("#fecaca", "#b91c1c"),
+    "crackers": ("#fde68a", "#92400e"),
+    "frozen": ("#cffafe", "#0e7490"),
+    "household": ("#dbeafe", "#2563eb"),
+    "personal care": ("#e9d5ff", "#7c3aed"),
+    "pet care": ("#dcfce7", "#16a34a"),
+    "snacks": ("#fef3c7", "#d97706"),
+    "spreads": ("#ffedd5", "#ea580c"),
+}
+
 
 def get_scraper() -> UPCScraper:
     if scraper is None:
@@ -132,6 +149,51 @@ def _is_local_plu(upc: str) -> bool:
     globally registered products, so public UPC databases rarely have data.
     """
     return bool(upc) and upc.startswith("2")
+
+
+def _fallback_image_for_product(upc: str, category: Optional[str], name: Optional[str]) -> Dict[str, Any]:
+    """Create a local review-placeholder image for POS-only products."""
+    category_label = (category or "Product").strip() or "Product"
+    name_label = (name or f"UPC {upc}").strip() or f"UPC {upc}"
+    bg, fg = FALLBACK_IMAGE_COLORS.get(category_label.lower(), ("#f5f5f7", "#1d1d1f"))
+    filename = f"review-{upc}.svg"
+    filepath = os.path.join(uploads_dir, filename)
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="900" height="900" viewBox="0 0 900 900">
+  <rect width="900" height="900" rx="56" fill="{bg}"/>
+  <rect x="72" y="72" width="756" height="756" rx="44" fill="#ffffff" opacity="0.88"/>
+  <text x="450" y="330" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="58" font-weight="700" fill="{fg}">{html.escape(category_label)}</text>
+  <text x="450" y="420" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="600" fill="#1d1d1f">{html.escape(name_label[:34])}</text>
+  <text x="450" y="500" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="28" fill="#6e6e73">UPC {html.escape(upc)}</text>
+  <text x="450" y="590" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="25" fill="#86868b">Review image needed</text>
+</svg>
+"""
+    FilePath(filepath).write_text(svg, encoding="utf-8")
+    return {
+        "url": f"/uploads/{filename}",
+        "source": "ShelfWise Review Placeholder",
+        "score": 0.2,
+        "verified": False,
+        "generated": True,
+        "width": 900,
+        "height": 900,
+    }
+
+
+def _ensure_visible_image(consolidated: Dict[str, Any]) -> None:
+    """Ensure the UI has a visual card even when public sources lack product photos."""
+    images = [img for img in consolidated.get("images", []) if isinstance(img, dict) and img.get("url")]
+    if images or consolidated.get("image_url"):
+        return
+    placeholder = _fallback_image_for_product(
+        str(consolidated.get("upc", "")),
+        consolidated.get("category"),
+        consolidated.get("name"),
+    )
+    consolidated["images"] = [placeholder]
+    consolidated["image_url"] = placeholder["url"]
+    consolidated.setdefault("reasoning_trace", []).append(
+        "Added ShelfWise review placeholder because no verified public product image was found"
+    )
 
 
 def _build_from_seed(upc: str, seed: Dict[str, Any]) -> Dict[str, Any]:
@@ -272,6 +334,7 @@ async def process_upc(upc: str, job_id: str, seed_data: Optional[Dict[str, Any]]
                     scrape_elapsed = time.time() - start
                     _scrape_times.append(scrape_elapsed)
                     consolidated_dict = _merge_seed_data(consolidated_dict, seed_data, prefer_seed=True)
+                    _ensure_visible_image(consolidated_dict)
                     logger.info(f"UPC {upc}: consolidated with confidence {consolidated_dict.get('confidence', 0)}")
                     product = ConsolidatedProduct(**consolidated_dict)
                     upsert_product(product)
@@ -320,6 +383,8 @@ async def process_upc(upc: str, job_id: str, seed_data: Optional[Dict[str, Any]]
                         logger.info(f"UPC {upc}: selected {len(verified)} images from name search")
             except Exception as e:
                 logger.warning(f"UPC {upc}: name-based image search failed: {e}")
+
+        _ensure_visible_image(consolidated_dict)
 
         product = ConsolidatedProduct(**consolidated_dict)
         upsert_product(product)
@@ -787,9 +852,18 @@ def _filter_products_for_export(
 def _get_export_image_urls(product: Dict[str, Any], max_images: int = 5) -> List[str]:
     """Collect verified image URLs for export, primary first."""
     urls = []
-    if product.get("image_url"):
+    generated_urls = {
+        img.get("url")
+        for img in product.get("images", [])
+        if isinstance(img, dict) and (img.get("generated") or img.get("source") == "ShelfWise Review Placeholder")
+    }
+    if product.get("image_url") and product["image_url"] not in generated_urls:
         urls.append(product["image_url"])
     for img in product.get("images", []):
+        if not isinstance(img, dict):
+            continue
+        if img.get("generated") or img.get("source") == "ShelfWise Review Placeholder":
+            continue
         url = img.get("url") if isinstance(img, dict) else None
         if url and url not in urls:
             urls.append(url)

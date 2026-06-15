@@ -511,9 +511,13 @@ function renderProductCard(p) {
 
     const mainImage = images[0];
     const thumbnails = images.slice(1, 5);
+    const isGeneratedImage = Boolean(mainImage && (mainImage.generated || mainImage.source === 'ShelfWise Review Placeholder'));
 
     const mainImageHtml = mainImage
-        ? `<img src="${escapeHtml(mainImage.url)}" alt="${escapeHtml(p.name || 'Product image')}" class="product-image" loading="lazy" onclick="openLightbox(${escapeJsString(mainImage.url)}, ${escapeJsString(p.name || 'Product')})" style="cursor: zoom-in;" onerror="this.style.display='none'">`
+        ? `<div class="product-image-shell">
+                <img src="${escapeHtml(mainImage.url)}" alt="${escapeHtml(p.name || 'Product image')}" class="product-image" loading="lazy" onclick="openLightbox(${escapeJsString(mainImage.url)}, ${escapeJsString(p.name || 'Product')})" style="cursor: zoom-in;" onerror="this.style.display='none'">
+                ${isGeneratedImage ? '<span class="image-status-badge">Review image</span>' : ''}
+           </div>`
         : `<div class="product-image placeholder" role="img" aria-label="No image available">No image</div>`;
 
     const thumbnailsHtml = thumbnails.length > 0
