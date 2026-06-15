@@ -70,7 +70,9 @@ def init_db():
         products_required = {"upc", "name", "brand", "category", "confidence", "status", "data"}
         jobs_required = {"job_id", "total", "queued", "running", "completed", "failed"}
 
-        if not _table_has_columns(conn, "products", products_required) or not _table_has_columns(conn, "jobs", jobs_required):
+        if not _table_has_columns(conn, "products", products_required) or not _table_has_columns(
+            conn, "jobs", jobs_required
+        ):
             _reset_schema(conn)
 
         # Products table with optimized schema
@@ -320,9 +322,7 @@ def get_stats() -> Dict[str, Any]:
     conn = _get_connection()
     total = conn.execute("SELECT COUNT(*) FROM products").fetchone()[0]
     avg_conf = conn.execute("SELECT AVG(confidence) FROM products").fetchone()[0] or 0.0
-    status_counts = conn.execute(
-        "SELECT status, COUNT(*) FROM products GROUP BY status"
-    ).fetchall()
+    status_counts = conn.execute("SELECT status, COUNT(*) FROM products GROUP BY status").fetchall()
     category_counts = conn.execute(
         "SELECT category, COUNT(*) FROM products WHERE category IS NOT NULL GROUP BY category"
     ).fetchall()

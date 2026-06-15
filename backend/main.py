@@ -66,11 +66,16 @@ _scrape_times: List[float] = []
 async def lifespan(app: FastAPI):
     global http_client, scraper, foundry_iq, agent
     init_db()
-    http_client = httpx.AsyncClient(timeout=30.0, limits=httpx.Limits(max_connections=300, max_keepalive_connections=100))
+    http_client = httpx.AsyncClient(
+        timeout=30.0, limits=httpx.Limits(max_connections=300, max_keepalive_connections=100)
+    )
     scraper = UPCScraper(http_client)
     foundry_iq = get_foundry_iq_service(db_path="shelfwise.db")
     agent = ProductReasoningAgent(foundry_iq_service=foundry_iq)
-    logger.info("ShelfWise API started (optimized) | Foundry IQ: %s", "azure" if foundry_iq.is_real_integration else "local_simulation")
+    logger.info(
+        "ShelfWise API started (optimized) | Foundry IQ: %s",
+        "azure" if foundry_iq.is_real_integration else "local_simulation",
+    )
     logger.info(
         "Foundry reasoning clients | azure-ai-inference=%s azure-ai-projects=%s openai-compatible=%s",
         agent._azure_client is not None,
@@ -157,9 +162,11 @@ async def process_upc(upc: str, job_id: str):
         update_job(job_id, "failed", 1)
         try:
             error_product = ConsolidatedProduct(
-                upc=upc, name=f"Error: {upc}",
+                upc=upc,
+                name=f"Error: {upc}",
                 description=f"Failed to process UPC {upc}: {str(e)}",
-                confidence=0.0, status="error",
+                confidence=0.0,
+                status="error",
                 reasoning_trace=[f"Error during processing: {str(e)}"],
             )
             upsert_product(error_product)
@@ -171,10 +178,12 @@ async def process_upc(upc: str, job_id: str):
 # API Endpoints
 # ---------------------------------------------------------------------------
 
+
 @app.get("/")
 async def root():
     return {
-        "name": "ShelfWise", "version": "1.1.0",
+        "name": "ShelfWise",
+        "version": "1.1.0",
         "description": "AI Product Portfolio Builder for Small Businesses",
         "status": "ok",
         "endpoints": [
@@ -197,19 +206,38 @@ async def root():
 
 DEMO_PRODUCTS = [
     {
-        "upc": "049000050103", "name": "Coca-Cola Classic", "brand": "Coca-Cola",
+        "upc": "049000050103",
+        "name": "Coca-Cola Classic",
+        "brand": "Coca-Cola",
         "category": "Colas",
         "description": "Coca-Cola Classic - The original and refreshing taste. 2 liter bottle. Perfect for parties, gatherings, and everyday enjoyment.",
         "image_url": "https://images.openfoodfacts.org/images/products/004/900/005/0103/front_en.96.400.jpg",
         "images": [
-            {"url": "https://images.openfoodfacts.org/images/products/004/900/005/0103/front_en.96.400.jpg", "source": "Open Food Facts", "score": 0.9},
+            {
+                "url": "https://images.openfoodfacts.org/images/products/004/900/005/0103/front_en.96.400.jpg",
+                "source": "Open Food Facts",
+                "score": 0.9,
+            },
             {"url": "https://pics.walgreens.com/prodimg/416899/450.jpg", "source": "UPCItemDB", "score": 0.85},
         ],
         "attributes": {"size": "2 Liter", "flavor": "Original", "container": "Bottle", "color": "Red"},
-        "confidence": 0.95, "status": "complete",
+        "confidence": 0.95,
+        "status": "complete",
         "citations": [
-            {"source": "Open Food Facts", "source_url": "https://world.openfoodfacts.org/api/v2/product/049000050103.json", "fields": ["name", "brand", "category", "images", "attributes"], "confidence": 0.9, "note": "Primary source with full product data"},
-            {"source": "UPCItemDB", "source_url": "https://api.upcitemdb.com/prod/trial/lookup?upc=049000050103", "fields": ["name", "brand", "images"], "confidence": 0.85, "note": "Confirmed name and brand"},
+            {
+                "source": "Open Food Facts",
+                "source_url": "https://world.openfoodfacts.org/api/v2/product/049000050103.json",
+                "fields": ["name", "brand", "category", "images", "attributes"],
+                "confidence": 0.9,
+                "note": "Primary source with full product data",
+            },
+            {
+                "source": "UPCItemDB",
+                "source_url": "https://api.upcitemdb.com/prod/trial/lookup?upc=049000050103",
+                "fields": ["name", "brand", "images"],
+                "confidence": 0.85,
+                "note": "Confirmed name and brand",
+            },
         ],
         "reasoning_trace": [
             "Starting consolidation for UPC 049000050103",
@@ -222,23 +250,46 @@ DEMO_PRODUCTS = [
             "Selected 2 images, best: True",
             "Computed confidence: 0.95",
             "Generated 2 citations",
-            "Status: complete"
-        ]
+            "Status: complete",
+        ],
     },
     {
-        "upc": "022000020806", "name": "M&M's Milk Chocolate", "brand": "Mars",
+        "upc": "022000020806",
+        "name": "M&M's Milk Chocolate",
+        "brand": "Mars",
         "category": "Candy & Chocolate",
         "description": "M&M's Milk Chocolate - Colorful candy-coated chocolates in a convenient sharing size bag. A classic American snack since 1941.",
         "image_url": "https://target.scene7.com/is/image/Target/GUEST_3d2ee4ac-ace5-4e21-86c2-575d2f5a4f11?wid=488&hei=488&fmt=pjpeg",
         "images": [
-            {"url": "https://target.scene7.com/is/image/Target/GUEST_3d2ee4ac-ace5-4e21-86c2-575d2f5a4f11?wid=488&hei=488&fmt=pjpeg", "source": "Target", "score": 0.8},
-            {"url": "https://i5.walmartimages.com/asr/5e0e2e2e-2e2e-2e2e-2e2e-2e2e2e2e2e2e_1.2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e.jpeg", "source": "Walmart", "score": 0.75},
+            {
+                "url": "https://target.scene7.com/is/image/Target/GUEST_3d2ee4ac-ace5-4e21-86c2-575d2f5a4f11?wid=488&hei=488&fmt=pjpeg",
+                "source": "Target",
+                "score": 0.8,
+            },
+            {
+                "url": "https://i5.walmartimages.com/asr/5e0e2e2e-2e2e-2e2e-2e2e-2e2e2e2e2e2e_1.2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e.jpeg",
+                "source": "Walmart",
+                "score": 0.75,
+            },
         ],
         "attributes": {"size": "1.69 oz", "flavor": "Milk Chocolate", "container": "Bag", "type": "Candy"},
-        "confidence": 0.92, "status": "complete",
+        "confidence": 0.92,
+        "status": "complete",
         "citations": [
-            {"source": "UPCItemDB", "source_url": "https://api.upcitemdb.com/prod/trial/lookup?upc=022000020806", "fields": ["name", "brand", "category", "images"], "confidence": 0.85, "note": "Full product record with images"},
-            {"source": "Buycott", "source_url": "https://www.buycott.com/upc/022000020806", "fields": ["name", "brand"], "confidence": 0.7, "note": "Confirmed brand ownership"},
+            {
+                "source": "UPCItemDB",
+                "source_url": "https://api.upcitemdb.com/prod/trial/lookup?upc=022000020806",
+                "fields": ["name", "brand", "category", "images"],
+                "confidence": 0.85,
+                "note": "Full product record with images",
+            },
+            {
+                "source": "Buycott",
+                "source_url": "https://www.buycott.com/upc/022000020806",
+                "fields": ["name", "brand"],
+                "confidence": 0.7,
+                "note": "Confirmed brand ownership",
+            },
         ],
         "reasoning_trace": [
             "Starting consolidation for UPC 022000020806",
@@ -251,23 +302,46 @@ DEMO_PRODUCTS = [
             "Selected 2 images, best: True",
             "Computed confidence: 0.92",
             "Generated 2 citations",
-            "Status: complete"
-        ]
+            "Status: complete",
+        ],
     },
     {
-        "upc": "012000001307", "name": "Pepsi Light", "brand": "Pepsi",
+        "upc": "012000001307",
+        "name": "Pepsi Light",
+        "brand": "Pepsi",
         "category": "Soda",
         "description": "Pepsi Light - Refreshing diet cola with zero sugar and zero calories. 20 fl oz bottle.",
         "image_url": "https://images.openfoodfacts.org/images/products/001/200/000/1307/front_fr.5.400.jpg",
         "images": [
-            {"url": "https://images.openfoodfacts.org/images/products/001/200/000/1307/front_fr.5.400.jpg", "source": "Open Food Facts", "score": 0.9},
-            {"url": "https://i5.walmartimages.com/asr/c0294df7-bb4a-4545-96a4-548993338765_1.99f18eeb42d60ab95f50a7ae7fcf25d3.jpeg", "source": "Walmart", "score": 0.85},
+            {
+                "url": "https://images.openfoodfacts.org/images/products/001/200/000/1307/front_fr.5.400.jpg",
+                "source": "Open Food Facts",
+                "score": 0.9,
+            },
+            {
+                "url": "https://i5.walmartimages.com/asr/c0294df7-bb4a-4545-96a4-548993338765_1.99f18eeb42d60ab95f50a7ae7fcf25d3.jpeg",
+                "source": "Walmart",
+                "score": 0.85,
+            },
         ],
         "attributes": {"size": "20 fl oz", "flavor": "Diet Cola", "container": "Bottle", "calories": "0"},
-        "confidence": 0.93, "status": "complete",
+        "confidence": 0.93,
+        "status": "complete",
         "citations": [
-            {"source": "Open Food Facts", "source_url": "https://world.openfoodfacts.org/api/v2/product/012000001307.json", "fields": ["name", "brand", "images", "attributes"], "confidence": 0.9, "note": "Primary source with nutrition data"},
-            {"source": "UPCItemDB", "source_url": "https://api.upcitemdb.com/prod/trial/lookup?upc=012000001307", "fields": ["name", "brand", "category"], "confidence": 0.85, "note": "Confirmed category and brand"},
+            {
+                "source": "Open Food Facts",
+                "source_url": "https://world.openfoodfacts.org/api/v2/product/012000001307.json",
+                "fields": ["name", "brand", "images", "attributes"],
+                "confidence": 0.9,
+                "note": "Primary source with nutrition data",
+            },
+            {
+                "source": "UPCItemDB",
+                "source_url": "https://api.upcitemdb.com/prod/trial/lookup?upc=012000001307",
+                "fields": ["name", "brand", "category"],
+                "confidence": 0.85,
+                "note": "Confirmed category and brand",
+            },
         ],
         "reasoning_trace": [
             "Starting consolidation for UPC 012000001307",
@@ -280,8 +354,8 @@ DEMO_PRODUCTS = [
             "Selected 2 images, best: True",
             "Computed confidence: 0.93",
             "Generated 2 citations",
-            "Status: complete"
-        ]
+            "Status: complete",
+        ],
     },
 ]
 
@@ -290,6 +364,7 @@ DEMO_PRODUCTS = [
 async def demo(background_tasks: BackgroundTasks):
     job_id = create_job(DEMO_UPCS)
     from backend.database import _get_connection
+
     conn = _get_connection()
     for product_data in DEMO_PRODUCTS:
         conn.execute(
@@ -330,21 +405,26 @@ async def batch(request: UPCBatchRequest, background_tasks: BackgroundTasks):
 
 @app.post("/api/upload-csv")
 async def upload_csv(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
-    if not file.filename.endswith('.csv'):
+    if not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="File must be a CSV")
     try:
         content = await file.read()
-        text = content.decode('utf-8')
+        text = content.decode("utf-8")
         reader = csv.DictReader(io.StringIO(text))
-        if 'upc' not in reader.fieldnames:
+        if "upc" not in reader.fieldnames:
             raise HTTPException(status_code=400, detail="CSV must have a column named 'upc'")
-        upcs = [row['upc'].strip() for row in reader if row['upc'].strip()]
+        upcs = [row["upc"].strip() for row in reader if row["upc"].strip()]
         if not upcs:
             raise HTTPException(status_code=400, detail="No UPCs found in CSV")
         job_id = create_job(upcs)
         for upc in upcs:
             background_tasks.add_task(process_upc, upc, job_id)
-        return {"message": f"Processing {len(upcs)} UPCs from CSV", "job_id": job_id, "total": len(upcs), "filename": file.filename}
+        return {
+            "message": f"Processing {len(upcs)} UPCs from CSV",
+            "job_id": job_id,
+            "total": len(upcs),
+            "filename": file.filename,
+        }
     except HTTPException:
         raise
     except Exception as e:
@@ -404,100 +484,369 @@ async def export_portfolio(request: ExportRequest):
     if fmt == "csv":
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(["upc", "name", "brand", "category", "description", "image_url", "confidence", "status", "citations"])
+        writer.writerow(
+            ["upc", "name", "brand", "category", "description", "image_url", "confidence", "status", "citations"]
+        )
         for p in products:
             citations_str = "; ".join(f"{c['source']}:{','.join(c['fields'])}" for c in p.get("citations", []))
-            writer.writerow([p.get("upc", ""), p.get("name", ""), p.get("brand", ""), p.get("category", ""), p.get("description", ""), p.get("image_url", ""), p.get("confidence", 0), p.get("status", ""), citations_str])
+            writer.writerow(
+                [
+                    p.get("upc", ""),
+                    p.get("name", ""),
+                    p.get("brand", ""),
+                    p.get("category", ""),
+                    p.get("description", ""),
+                    p.get("image_url", ""),
+                    p.get("confidence", 0),
+                    p.get("status", ""),
+                    citations_str,
+                ]
+            )
         output.seek(0)
-        return StreamingResponse(io.BytesIO(output.getvalue().encode('utf-8')), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=shelfwise-portfolio.csv"})
+        return StreamingResponse(
+            io.BytesIO(output.getvalue().encode("utf-8")),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=shelfwise-portfolio.csv"},
+        )
 
     elif fmt == "json":
-        return StreamingResponse(io.BytesIO(json.dumps(products, indent=2).encode('utf-8')), media_type="application/json", headers={"Content-Disposition": "attachment; filename=shelfwise-portfolio.json"})
+        return StreamingResponse(
+            io.BytesIO(json.dumps(products, indent=2).encode("utf-8")),
+            media_type="application/json",
+            headers={"Content-Disposition": "attachment; filename=shelfwise-portfolio.json"},
+        )
 
     elif fmt == "shopify":
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(["Handle", "Title", "Body (HTML)", "Vendor", "Type", "Tags", "Published", "Option1 Name", "Option1 Value", "Variant SKU", "Variant Grams", "Variant Inventory Tracker", "Variant Inventory Qty", "Variant Inventory Policy", "Variant Fulfillment Service", "Variant Price", "Variant Compare At Price", "Image Src"])
+        writer.writerow(
+            [
+                "Handle",
+                "Title",
+                "Body (HTML)",
+                "Vendor",
+                "Type",
+                "Tags",
+                "Published",
+                "Option1 Name",
+                "Option1 Value",
+                "Variant SKU",
+                "Variant Grams",
+                "Variant Inventory Tracker",
+                "Variant Inventory Qty",
+                "Variant Inventory Policy",
+                "Variant Fulfillment Service",
+                "Variant Price",
+                "Variant Compare At Price",
+                "Image Src",
+            ]
+        )
         for p in products:
             handle = p.get("upc", "").lower()
-            writer.writerow([handle, p.get("name", ""), p.get("description", ""), p.get("brand", ""), p.get("category", ""), f"upc-{p.get('upc', '')}, shelfwise", "TRUE", "Title", "Default Title", p.get("upc", ""), "0", "", "0", "deny", "manual", "", "", p.get("image_url", "")])
+            writer.writerow(
+                [
+                    handle,
+                    p.get("name", ""),
+                    p.get("description", ""),
+                    p.get("brand", ""),
+                    p.get("category", ""),
+                    f"upc-{p.get('upc', '')}, shelfwise",
+                    "TRUE",
+                    "Title",
+                    "Default Title",
+                    p.get("upc", ""),
+                    "0",
+                    "",
+                    "0",
+                    "deny",
+                    "manual",
+                    "",
+                    "",
+                    p.get("image_url", ""),
+                ]
+            )
         output.seek(0)
-        return StreamingResponse(io.BytesIO(output.getvalue().encode('utf-8')), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=shelfwise-shopify.csv"})
+        return StreamingResponse(
+            io.BytesIO(output.getvalue().encode("utf-8")),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=shelfwise-shopify.csv"},
+        )
 
     elif fmt == "amazon":
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(["sku", "product-id", "product-id-type", "item-name", "brand-name", "manufacturer", "product-description", "item-type", "update-delete", "standard-price", "quantity", "main-image-url"])
+        writer.writerow(
+            [
+                "sku",
+                "product-id",
+                "product-id-type",
+                "item-name",
+                "brand-name",
+                "manufacturer",
+                "product-description",
+                "item-type",
+                "update-delete",
+                "standard-price",
+                "quantity",
+                "main-image-url",
+            ]
+        )
         for p in products:
-            writer.writerow([p.get("upc", ""), p.get("upc", ""), "3", p.get("name", ""), p.get("brand", ""), p.get("brand", ""), p.get("description", ""), p.get("category", ""), "", "", "", p.get("image_url", "")])
+            writer.writerow(
+                [
+                    p.get("upc", ""),
+                    p.get("upc", ""),
+                    "3",
+                    p.get("name", ""),
+                    p.get("brand", ""),
+                    p.get("brand", ""),
+                    p.get("description", ""),
+                    p.get("category", ""),
+                    "",
+                    "",
+                    "",
+                    p.get("image_url", ""),
+                ]
+            )
         output.seek(0)
-        return StreamingResponse(io.BytesIO(output.getvalue().encode('utf-8')), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=shelfwise-amazon.csv"})
+        return StreamingResponse(
+            io.BytesIO(output.getvalue().encode("utf-8")),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=shelfwise-amazon.csv"},
+        )
 
     elif fmt == "woocommerce":
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(["ID", "Type", "SKU", "Name", "Published", "Description", "Short description", "Categories", "Images"])
+        writer.writerow(
+            ["ID", "Type", "SKU", "Name", "Published", "Description", "Short description", "Categories", "Images"]
+        )
         for p in products:
-            writer.writerow(["", "simple", p.get("upc", ""), p.get("name", ""), "1", p.get("description", ""), "", p.get("category", ""), p.get("image_url", "")])
+            writer.writerow(
+                [
+                    "",
+                    "simple",
+                    p.get("upc", ""),
+                    p.get("name", ""),
+                    "1",
+                    p.get("description", ""),
+                    "",
+                    p.get("category", ""),
+                    p.get("image_url", ""),
+                ]
+            )
         output.seek(0)
-        return StreamingResponse(io.BytesIO(output.getvalue().encode('utf-8')), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=shelfwise-woocommerce.csv"})
+        return StreamingResponse(
+            io.BytesIO(output.getvalue().encode("utf-8")),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=shelfwise-woocommerce.csv"},
+        )
 
     elif fmt == "ebay":
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(["*Action(SiteID=US|Country=US|Currency=USD|Version=941|CC=ISO-8859-1)", "ItemID", "Title", "Category", "PicURL", "Description", "Format", "Duration", "StartPrice", "Quantity", "Location", "ShippingType", "ShippingService-1:Option", "ShippingService-1:Cost", "ReturnsAcceptedOption", "RefundOption", "ReturnPolicyDescription"])
+        writer.writerow(
+            [
+                "*Action(SiteID=US|Country=US|Currency=USD|Version=941|CC=ISO-8859-1)",
+                "ItemID",
+                "Title",
+                "Category",
+                "PicURL",
+                "Description",
+                "Format",
+                "Duration",
+                "StartPrice",
+                "Quantity",
+                "Location",
+                "ShippingType",
+                "ShippingService-1:Option",
+                "ShippingService-1:Cost",
+                "ReturnsAcceptedOption",
+                "RefundOption",
+                "ReturnPolicyDescription",
+            ]
+        )
         for p in products:
-            writer.writerow(["Add", "", p.get("name", ""), p.get("category", ""), p.get("image_url", ""), p.get("description", ""), "FixedPrice", "GTC", "", "1", "US", "Flat", "USPSMedia", "0", "ReturnsAccepted", "MoneyBack", ""])
+            writer.writerow(
+                [
+                    "Add",
+                    "",
+                    p.get("name", ""),
+                    p.get("category", ""),
+                    p.get("image_url", ""),
+                    p.get("description", ""),
+                    "FixedPrice",
+                    "GTC",
+                    "",
+                    "1",
+                    "US",
+                    "Flat",
+                    "USPSMedia",
+                    "0",
+                    "ReturnsAccepted",
+                    "MoneyBack",
+                    "",
+                ]
+            )
         output.seek(0)
-        return StreamingResponse(io.BytesIO(output.getvalue().encode('utf-8')), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=shelfwise-ebay.csv"})
+        return StreamingResponse(
+            io.BytesIO(output.getvalue().encode("utf-8")),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=shelfwise-ebay.csv"},
+        )
 
     elif fmt == "etsy":
         output = io.StringIO()
         writer = csv.writer(output)
         writer.writerow(["TITLE", "DESCRIPTION", "PRICE", "CATEGORY", "QUANTITY", "TAGS", "MATERIALS", "IMAGE1"])
         for p in products:
-            writer.writerow([p.get("name", ""), p.get("description", ""), "", p.get("category", ""), "1", f"upc-{p.get('upc', '')}", "", p.get("image_url", "")])
+            writer.writerow(
+                [
+                    p.get("name", ""),
+                    p.get("description", ""),
+                    "",
+                    p.get("category", ""),
+                    "1",
+                    f"upc-{p.get('upc', '')}",
+                    "",
+                    p.get("image_url", ""),
+                ]
+            )
         output.seek(0)
-        return StreamingResponse(io.BytesIO(output.getvalue().encode('utf-8')), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=shelfwise-etsy.csv"})
+        return StreamingResponse(
+            io.BytesIO(output.getvalue().encode("utf-8")),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=shelfwise-etsy.csv"},
+        )
 
     elif fmt == "bigcommerce":
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(["Product Name", "Product Type", "Product Code/SKU", "Price", "Category", "Product Description", "Product Image URL - 1"])
+        writer.writerow(
+            [
+                "Product Name",
+                "Product Type",
+                "Product Code/SKU",
+                "Price",
+                "Category",
+                "Product Description",
+                "Product Image URL - 1",
+            ]
+        )
         for p in products:
-            writer.writerow([p.get("name", ""), "Physical", p.get("upc", ""), "", p.get("category", ""), p.get("description", ""), p.get("image_url", "")])
+            writer.writerow(
+                [
+                    p.get("name", ""),
+                    "Physical",
+                    p.get("upc", ""),
+                    "",
+                    p.get("category", ""),
+                    p.get("description", ""),
+                    p.get("image_url", ""),
+                ]
+            )
         output.seek(0)
-        return StreamingResponse(io.BytesIO(output.getvalue().encode('utf-8')), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=shelfwise-bigcommerce.csv"})
+        return StreamingResponse(
+            io.BytesIO(output.getvalue().encode("utf-8")),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=shelfwise-bigcommerce.csv"},
+        )
 
     elif fmt == "doordash":
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(["Merchant ID", "Item ID", "Item Name", "Description", "Category", "Price", "Image URL", "UPC", "Status"])
+        writer.writerow(
+            ["Merchant ID", "Item ID", "Item Name", "Description", "Category", "Price", "Image URL", "UPC", "Status"]
+        )
         for p in products:
-            writer.writerow(["", p.get("upc", ""), p.get("name", ""), p.get("description", ""), p.get("category", ""), "", p.get("image_url", ""), p.get("upc", ""), "Active"])
+            writer.writerow(
+                [
+                    "",
+                    p.get("upc", ""),
+                    p.get("name", ""),
+                    p.get("description", ""),
+                    p.get("category", ""),
+                    "",
+                    p.get("image_url", ""),
+                    p.get("upc", ""),
+                    "Active",
+                ]
+            )
         output.seek(0)
-        return StreamingResponse(io.BytesIO(output.getvalue().encode('utf-8')), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=shelfwise-doordash.csv"})
+        return StreamingResponse(
+            io.BytesIO(output.getvalue().encode("utf-8")),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=shelfwise-doordash.csv"},
+        )
 
     elif fmt == "ubereats":
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(["Menu ID", "Section", "Item Name", "Item Description", "Price", "Image URL", "External ID", "Dietary Tags"])
+        writer.writerow(
+            ["Menu ID", "Section", "Item Name", "Item Description", "Price", "Image URL", "External ID", "Dietary Tags"]
+        )
         for p in products:
-            writer.writerow(["", p.get("category", ""), p.get("name", ""), p.get("description", ""), "", p.get("image_url", ""), p.get("upc", ""), ""])
+            writer.writerow(
+                [
+                    "",
+                    p.get("category", ""),
+                    p.get("name", ""),
+                    p.get("description", ""),
+                    "",
+                    p.get("image_url", ""),
+                    p.get("upc", ""),
+                    "",
+                ]
+            )
         output.seek(0)
-        return StreamingResponse(io.BytesIO(output.getvalue().encode('utf-8')), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=shelfwise-ubereats.csv"})
+        return StreamingResponse(
+            io.BytesIO(output.getvalue().encode("utf-8")),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=shelfwise-ubereats.csv"},
+        )
 
     elif fmt == "grubhub":
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(["Restaurant ID", "Menu Item ID", "Item Name", "Description", "Category", "Price", "Image URL", "UPC", "Enabled"])
+        writer.writerow(
+            [
+                "Restaurant ID",
+                "Menu Item ID",
+                "Item Name",
+                "Description",
+                "Category",
+                "Price",
+                "Image URL",
+                "UPC",
+                "Enabled",
+            ]
+        )
         for p in products:
-            writer.writerow(["", p.get("upc", ""), p.get("name", ""), p.get("description", ""), p.get("category", ""), "", p.get("image_url", ""), p.get("upc", ""), "TRUE"])
+            writer.writerow(
+                [
+                    "",
+                    p.get("upc", ""),
+                    p.get("name", ""),
+                    p.get("description", ""),
+                    p.get("category", ""),
+                    "",
+                    p.get("image_url", ""),
+                    p.get("upc", ""),
+                    "TRUE",
+                ]
+            )
         output.seek(0)
-        return StreamingResponse(io.BytesIO(output.getvalue().encode('utf-8')), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=shelfwise-grubhub.csv"})
+        return StreamingResponse(
+            io.BytesIO(output.getvalue().encode("utf-8")),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=shelfwise-grubhub.csv"},
+        )
 
     else:
-        raise HTTPException(status_code=400, detail="Format must be one of: csv, json, shopify, amazon, woocommerce, ebay, etsy, bigcommerce, doordash, ubereats, grubhub")
+        raise HTTPException(
+            status_code=400,
+            detail="Format must be one of: csv, json, shopify, amazon, woocommerce, ebay, etsy, bigcommerce, doordash, ubereats, grubhub",
+        )
 
 
 @app.get("/api/jobs/{job_id}")
@@ -511,6 +860,7 @@ async def get_job_status(job_id: str):
 @app.get("/api/jobs/{job_id}/stream")
 async def stream_job_status(job_id: str):
     import asyncio
+
     async def event_generator():
         last_status = None
         for _ in range(600):
@@ -531,7 +881,12 @@ async def stream_job_status(job_id: str):
             await asyncio.sleep(0.5)
         else:
             yield f"data: {json.dumps({'type': 'timeout', 'message': 'Stream timed out'})}\n\n"
-    return StreamingResponse(event_generator(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"})
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.get("/api/health")
@@ -540,6 +895,7 @@ async def health_check():
     # Dynamically count registry sources
     try:
         from backend.scraper_registry import ScraperRegistry
+
         registry = ScraperRegistry()
         registry_count = registry.get_source_count()
     except Exception:
@@ -579,7 +935,11 @@ async def compare_product(upc: str):
         data = json.loads(product["data"])
     except json.JSONDecodeError:
         raise HTTPException(status_code=500, detail="Corrupted product data")
-    return {"upc": upc, "consolidated": data, "note": "This endpoint shows the final consolidated record. Raw source data is preserved in the reasoning trace and citations."}
+    return {
+        "upc": upc,
+        "consolidated": data,
+        "note": "This endpoint shows the final consolidated record. Raw source data is preserved in the reasoning trace and citations.",
+    }
 
 
 @app.post("/api/clear")
@@ -622,6 +982,7 @@ async def metrics():
 # ---------------------------------------------------------------------------
 # Foundry IQ Endpoints
 # ---------------------------------------------------------------------------
+
 
 @app.get("/api/foundry/health")
 async def foundry_health():

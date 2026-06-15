@@ -24,7 +24,7 @@ async def test_scrape_openfoodfacts_success(scraper):
             "categories": "Snacks,Chips",
             "image_url": "https://example.com/image.jpg",
             "quantity": "150g",
-        }
+        },
     }
 
     with patch.object(scraper, "_get_with_retry", return_value=mock_response):
@@ -54,13 +54,15 @@ async def test_scrape_upcitemdb_success(scraper):
     """Test UPCItemDB scraper with successful response."""
     mock_response = MagicMock()
     mock_response.json.return_value = {
-        "items": [{
-            "title": "Test Item",
-            "brand": "TestBrand",
-            "category": "Electronics",
-            "description": "A test item",
-            "images": ["https://example.com/img.jpg"],
-        }]
+        "items": [
+            {
+                "title": "Test Item",
+                "brand": "TestBrand",
+                "category": "Electronics",
+                "description": "A test item",
+                "images": ["https://example.com/img.jpg"],
+            }
+        ]
     }
 
     with patch.object(scraper, "_get_with_retry", return_value=mock_response):
@@ -82,18 +84,20 @@ async def test_scrape_all_aggregates_results(scraper):
             "brands": "OFFBrand",
             "categories": "Food",
             "image_url": "https://off.com/img.jpg",
-        }
+        },
     }
 
     upc_response = MagicMock()
     upc_response.json.return_value = {
-        "items": [{
-            "title": "UPC Product",
-            "brand": "UPCBrand",
-            "category": "Groceries",
-            "description": "UPC description",
-            "images": ["https://upc.com/img.jpg"],
-        }]
+        "items": [
+            {
+                "title": "UPC Product",
+                "brand": "UPCBrand",
+                "category": "Groceries",
+                "description": "UPC description",
+                "images": ["https://upc.com/img.jpg"],
+            }
+        ]
     }
 
     fail_response = MagicMock()

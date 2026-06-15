@@ -37,14 +37,18 @@ SOURCE_WEIGHTS = {
     "Demo Fallback": 0.40,
 }
 
-DEFAULT_HEADERS = {
-    "User-Agent": "ShelfWise/1.0 (AI Product Portfolio Builder; contact@shelfwise.local)"
-}
+DEFAULT_HEADERS = {"User-Agent": "ShelfWise/1.0 (AI Product Portfolio Builder; contact@shelfwise.local)"}
 
 ROTATING_HEADERS = [
-    {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"},
-    {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"},
-    {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"},
+    {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+    },
+    {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+    },
+    {
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+    },
 ]
 
 # Circuit breaker state
@@ -106,8 +110,12 @@ def _is_valid_image_url(url: str) -> bool:
 class CircuitBreaker:
     """Simple circuit breaker for external APIs."""
 
-    def __init__(self, name: str, failure_threshold: int = CIRCUIT_FAILURE_THRESHOLD,
-                 recovery_timeout: float = CIRCUIT_RECOVERY_TIMEOUT):
+    def __init__(
+        self,
+        name: str,
+        failure_threshold: int = CIRCUIT_FAILURE_THRESHOLD,
+        recovery_timeout: float = CIRCUIT_RECOVERY_TIMEOUT,
+    ):
         self.name = name
         self.failure_threshold = failure_threshold
         self.recovery_timeout = recovery_timeout
@@ -161,8 +169,7 @@ class UPCScraper:
         self.request_count += 1
         return headers
 
-    async def _get_with_retry(self, url: str, timeout: float = 10.0, retries: int = 2,
-                              **kwargs) -> httpx.Response:
+    async def _get_with_retry(self, url: str, timeout: float = 10.0, retries: int = 2, **kwargs) -> httpx.Response:
         """GET with exponential backoff retry."""
         last_error = None
         # Build headers from kwarg or default
@@ -179,7 +186,7 @@ class UPCScraper:
             except Exception as e:
                 last_error = e
                 if attempt < retries:
-                    wait = 2 ** attempt
+                    wait = 2**attempt
                     logger.warning(f"Retry {attempt + 1}/{retries} for {url}: {e}")
                     await asyncio.sleep(wait)
         raise last_error
@@ -228,10 +235,7 @@ class UPCScraper:
         # Dynamic registry scrapers (limit to top weighted sources for speed/quality)
         registry_sources = self._get_registry_sources(max_sources=30)
         # Pair each source with its scraper to preserve weight for sorting
-        registry_pairs = [
-            (src, self._make_registry_scraper(src))
-            for src in registry_sources
-        ]
+        registry_pairs = [(src, self._make_registry_scraper(src)) for src in registry_sources]
 
         # Combine all scrapers: core + registry
         all_scrapers = core_scrapers + [(src["name"], fn) for src, fn in registry_pairs]
@@ -250,7 +254,7 @@ class UPCScraper:
             sorted_registry = sorted(registry_pairs, key=lambda p: p[0].get("weight", 0.3), reverse=True)
             core_names = {n for n, _ in core_scrapers}
             extra_registry = [(src["name"], fn) for src, fn in sorted_registry if src["name"] not in core_names]
-            unique_scrapers = core_scrapers + extra_registry[:max_concurrent - len(core_scrapers)]
+            unique_scrapers = core_scrapers + extra_registry[: max_concurrent - len(core_scrapers)]
 
         tasks = [self._safe_scrape(name, fn, upc) for name, fn in unique_scrapers]
         source_results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -275,6 +279,7 @@ class UPCScraper:
         """Load scraper sources from registry file."""
         try:
             from backend.scraper_registry import ScraperRegistry
+
             registry = ScraperRegistry()
             return registry.get_enabled_sources(max_sources=max_sources)
         except Exception as e:
@@ -283,8 +288,10 @@ class UPCScraper:
 
     def _make_registry_scraper(self, source_def: Dict[str, Any]):
         """Create a dynamic scraper function from a registry definition."""
+
         async def _scraper(upc: str) -> Dict[str, Any]:
             return await self._registry_scrape(source_def, upc)
+
         return _scraper
 
     async def _registry_scrape(self, source_def: Dict[str, Any], upc: str) -> Dict[str, Any]:
@@ -380,17 +387,26 @@ class UPCScraper:
             condition_value = success_condition[1]
             actual_value = get_nested(data, [condition_field])
             if actual_value != condition_value:
-                return self._fail(source_name, url, data, f"Success condition not met: {condition_field}={actual_value}")
+                return self._fail(
+                    source_name, url, data, f"Success condition not met: {condition_field}={actual_value}"
+                )
 
         if not name:
             return self._fail(source_name, url, data, "Product not found")
 
         return {
-            "upc": upc, "source": source_name, "source_url": url,
-            "name": name, "brand": brand, "category": category,
-            "description": description, "image_urls": image_urls,
-            "attributes": attributes, "raw": data,
-            "success": True, "error": None,
+            "upc": upc,
+            "source": source_name,
+            "source_url": url,
+            "name": name,
+            "brand": brand,
+            "category": category,
+            "description": description,
+            "image_urls": image_urls,
+            "attributes": attributes,
+            "raw": data,
+            "success": True,
+            "error": None,
         }
 
     def _extract_html_data(self, source_def: Dict[str, Any], html: str, upc: str, url: str) -> Dict[str, Any]:
@@ -463,11 +479,18 @@ class UPCScraper:
             return self._fail(source_name, url, {}, "Product not found")
 
         return {
-            "upc": upc, "source": source_name, "source_url": url,
-            "name": name, "brand": brand, "category": None,
-            "description": description, "image_urls": image_urls,
-            "attributes": attributes, "raw": {"html_snippet": soup.get_text()[:500]},
-            "success": True, "error": None,
+            "upc": upc,
+            "source": source_name,
+            "source_url": url,
+            "name": name,
+            "brand": brand,
+            "category": None,
+            "description": description,
+            "image_urls": image_urls,
+            "attributes": attributes,
+            "raw": {"html_snippet": soup.get_text()[:500]},
+            "success": True,
+            "error": None,
         }
 
     async def _safe_scrape(self, name: str, scrape_fn, upc: str) -> Dict[str, Any]:
@@ -524,11 +547,18 @@ class UPCScraper:
             attributes["nutriments"] = product["nutriments"]
 
         return {
-            "upc": upc, "source": "Open Food Facts", "source_url": url,
-            "name": product.get("product_name"), "brand": product.get("brands"),
-            "category": category, "description": product.get("generic_name") or product.get("categories"),
-            "image_urls": image_urls, "attributes": attributes, "raw": data,
-            "success": True, "error": None,
+            "upc": upc,
+            "source": "Open Food Facts",
+            "source_url": url,
+            "name": product.get("product_name"),
+            "brand": product.get("brands"),
+            "category": category,
+            "description": product.get("generic_name") or product.get("categories"),
+            "image_urls": image_urls,
+            "attributes": attributes,
+            "raw": data,
+            "success": True,
+            "error": None,
         }
 
     async def _upcitemdb(self, upc: str) -> Dict[str, Any]:
@@ -544,16 +574,32 @@ class UPCScraper:
         image_urls = [u for u in item.get("images", []) if _is_valid_image_url(u)]
 
         attributes = {}
-        for key in ["color", "size", "weight", "description", "lowest_recorded_price", "highest_recorded_price", "model", "title"]:
+        for key in [
+            "color",
+            "size",
+            "weight",
+            "description",
+            "lowest_recorded_price",
+            "highest_recorded_price",
+            "model",
+            "title",
+        ]:
             if item.get(key):
                 attributes[key] = item[key]
 
         return {
-            "upc": upc, "source": "UPCItemDB", "source_url": url,
-            "name": item.get("title"), "brand": item.get("brand"),
-            "category": item.get("category"), "description": item.get("description"),
-            "image_urls": image_urls, "attributes": attributes, "raw": data,
-            "success": True, "error": None,
+            "upc": upc,
+            "source": "UPCItemDB",
+            "source_url": url,
+            "name": item.get("title"),
+            "brand": item.get("brand"),
+            "category": item.get("category"),
+            "description": item.get("description"),
+            "image_urls": image_urls,
+            "attributes": attributes,
+            "raw": data,
+            "success": True,
+            "error": None,
         }
 
     async def _barcode_lookup(self, upc: str) -> Dict[str, Any]:
@@ -599,11 +645,18 @@ class UPCScraper:
             return self._fail("BarcodeLookup", url, {}, "Product not found")
 
         return {
-            "upc": upc, "source": "BarcodeLookup", "source_url": url,
-            "name": name, "brand": brand, "category": None,
-            "description": description, "image_urls": image_urls,
-            "attributes": attributes, "raw": {"html_snippet": soup.get_text()[:500]},
-            "success": True, "error": None,
+            "upc": upc,
+            "source": "BarcodeLookup",
+            "source_url": url,
+            "name": name,
+            "brand": brand,
+            "category": None,
+            "description": description,
+            "image_urls": image_urls,
+            "attributes": attributes,
+            "raw": {"html_snippet": soup.get_text()[:500]},
+            "success": True,
+            "error": None,
         }
 
     async def _go_upc(self, upc: str) -> Dict[str, Any]:
@@ -636,11 +689,18 @@ class UPCScraper:
             return self._fail("Go-UPC", url, {}, "Product not found")
 
         return {
-            "upc": upc, "source": "Go-UPC", "source_url": url,
-            "name": name, "brand": brand, "category": None,
-            "description": description, "image_urls": image_urls,
-            "attributes": {}, "raw": {"html_snippet": soup.get_text()[:500]},
-            "success": True, "error": None,
+            "upc": upc,
+            "source": "Go-UPC",
+            "source_url": url,
+            "name": name,
+            "brand": brand,
+            "category": None,
+            "description": description,
+            "image_urls": image_urls,
+            "attributes": {},
+            "raw": {"html_snippet": soup.get_text()[:500]},
+            "success": True,
+            "error": None,
         }
 
     async def _buycott(self, upc: str) -> Dict[str, Any]:
@@ -675,11 +735,18 @@ class UPCScraper:
             return self._fail("Buycott", url, {}, "Product not found")
 
         return {
-            "upc": upc, "source": "Buycott", "source_url": url,
-            "name": name, "brand": brand, "category": None,
-            "description": description, "image_urls": image_urls,
-            "attributes": {}, "raw": {"html_snippet": soup.get_text()[:500]},
-            "success": True, "error": None,
+            "upc": upc,
+            "source": "Buycott",
+            "source_url": url,
+            "name": name,
+            "brand": brand,
+            "category": None,
+            "description": description,
+            "image_urls": image_urls,
+            "attributes": {},
+            "raw": {"html_snippet": soup.get_text()[:500]},
+            "success": True,
+            "error": None,
         }
 
     async def _eandata(self, upc: str) -> Dict[str, Any]:
@@ -708,11 +775,18 @@ class UPCScraper:
             return self._fail("EANdata", url, {}, "Product not found")
 
         return {
-            "upc": upc, "source": "EANdata", "source_url": url,
-            "name": name, "brand": brand, "category": None,
-            "description": None, "image_urls": [],
-            "attributes": attributes, "raw": {"html_snippet": soup.get_text()[:500]},
-            "success": True, "error": None,
+            "upc": upc,
+            "source": "EANdata",
+            "source_url": url,
+            "name": name,
+            "brand": brand,
+            "category": None,
+            "description": None,
+            "image_urls": [],
+            "attributes": attributes,
+            "raw": {"html_snippet": soup.get_text()[:500]},
+            "success": True,
+            "error": None,
         }
 
     async def _lookify(self, upc: str) -> Dict[str, Any]:
@@ -741,11 +815,18 @@ class UPCScraper:
             return self._fail("Lookify", url, {}, "Product not found")
 
         return {
-            "upc": upc, "source": "Lookify", "source_url": url,
-            "name": name, "brand": brand, "category": None,
-            "description": None, "image_urls": image_urls,
-            "attributes": {}, "raw": {"html_snippet": soup.get_text()[:500]},
-            "success": True, "error": None,
+            "upc": upc,
+            "source": "Lookify",
+            "source_url": url,
+            "name": name,
+            "brand": brand,
+            "category": None,
+            "description": None,
+            "image_urls": image_urls,
+            "attributes": {},
+            "raw": {"html_snippet": soup.get_text()[:500]},
+            "success": True,
+            "error": None,
         }
 
     async def _upcdatabase(self, upc: str) -> Dict[str, Any]:
@@ -777,11 +858,18 @@ class UPCScraper:
             return self._fail("UPCDatabase", url, {}, "Product not found")
 
         return {
-            "upc": upc, "source": "UPCDatabase", "source_url": url,
-            "name": name, "brand": brand, "category": None,
-            "description": None, "image_urls": [],
-            "attributes": attributes, "raw": {"html_snippet": soup.get_text()[:500]},
-            "success": True, "error": None,
+            "upc": upc,
+            "source": "UPCDatabase",
+            "source_url": url,
+            "name": name,
+            "brand": brand,
+            "category": None,
+            "description": None,
+            "image_urls": [],
+            "attributes": attributes,
+            "raw": {"html_snippet": soup.get_text()[:500]},
+            "success": True,
+            "error": None,
         }
 
     async def _brave_search(self, upc: str) -> Dict[str, Any]:
@@ -797,11 +885,18 @@ class UPCScraper:
                 return self._fail("Brave Search", url, data, "No results")
             top = results[0]
             return {
-                "upc": upc, "source": "Brave Search", "source_url": top.get("url"),
-                "name": top.get("title", ""), "brand": None, "category": None,
-                "description": top.get("description", ""), "image_urls": [],
-                "attributes": {"search_results": len(results)}, "raw": data,
-                "success": True, "error": None,
+                "upc": upc,
+                "source": "Brave Search",
+                "source_url": top.get("url"),
+                "name": top.get("title", ""),
+                "brand": None,
+                "category": None,
+                "description": top.get("description", ""),
+                "image_urls": [],
+                "attributes": {"search_results": len(results)},
+                "raw": data,
+                "success": True,
+                "error": None,
             }
         else:
             url = f"https://search.brave.com/search?q={upc}"
@@ -823,11 +918,18 @@ class UPCScraper:
             if not name:
                 return self._fail("Brave Search", url, {}, "No results")
             return {
-                "upc": upc, "source": "Brave Search", "source_url": result_url or url,
-                "name": name, "brand": None, "category": None,
-                "description": description, "image_urls": [],
-                "attributes": {}, "raw": {"html_snippet": soup.get_text()[:500]},
-                "success": True, "error": None,
+                "upc": upc,
+                "source": "Brave Search",
+                "source_url": result_url or url,
+                "name": name,
+                "brand": None,
+                "category": None,
+                "description": description,
+                "image_urls": [],
+                "attributes": {},
+                "raw": {"html_snippet": soup.get_text()[:500]},
+                "success": True,
+                "error": None,
             }
 
     async def _google_search(self, upc: str) -> Dict[str, Any]:
@@ -843,11 +945,18 @@ class UPCScraper:
                 return self._fail("Google Search", url, data, "No results")
             top = items[0]
             return {
-                "upc": upc, "source": "Google Search", "source_url": top.get("link"),
-                "name": top.get("title", ""), "brand": None, "category": None,
-                "description": top.get("snippet", ""), "image_urls": [],
-                "attributes": {"search_results": len(items)}, "raw": data,
-                "success": True, "error": None,
+                "upc": upc,
+                "source": "Google Search",
+                "source_url": top.get("link"),
+                "name": top.get("title", ""),
+                "brand": None,
+                "category": None,
+                "description": top.get("snippet", ""),
+                "image_urls": [],
+                "attributes": {"search_results": len(items)},
+                "raw": data,
+                "success": True,
+                "error": None,
             }
         else:
             url = f"https://www.google.com/search?q={upc}"
@@ -868,11 +977,18 @@ class UPCScraper:
             if not name:
                 return self._fail("Google Search", url, {}, "No results")
             return {
-                "upc": upc, "source": "Google Search", "source_url": url,
-                "name": name, "brand": None, "category": None,
-                "description": description, "image_urls": [],
-                "attributes": {}, "raw": {"html_snippet": soup.get_text()[:500]},
-                "success": True, "error": None,
+                "upc": upc,
+                "source": "Google Search",
+                "source_url": url,
+                "name": name,
+                "brand": None,
+                "category": None,
+                "description": description,
+                "image_urls": [],
+                "attributes": {},
+                "raw": {"html_snippet": soup.get_text()[:500]},
+                "success": True,
+                "error": None,
             }
 
     def _get_demo_fallback(self, upc: str) -> Optional[Dict[str, Any]]:
@@ -888,8 +1004,16 @@ class UPCScraper:
     @staticmethod
     def _fail(source: str, url: str, raw: dict, error: str) -> Dict[str, Any]:
         return {
-            "upc": None, "source": source, "source_url": url,
-            "name": None, "brand": None, "category": None,
-            "description": None, "image_urls": [], "attributes": {},
-            "raw": raw, "success": False, "error": error,
+            "upc": None,
+            "source": source,
+            "source_url": url,
+            "name": None,
+            "brand": None,
+            "category": None,
+            "description": None,
+            "image_urls": [],
+            "attributes": {},
+            "raw": raw,
+            "success": False,
+            "error": error,
         }

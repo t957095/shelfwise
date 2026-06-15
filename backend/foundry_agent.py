@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Optional, Tuple
 # Ensure .env is loaded before reading env vars
 try:
     from dotenv import load_dotenv
+
     _env_path = Path(__file__).resolve().parent.parent / ".env"
     if _env_path.exists():
         load_dotenv(_env_path)
@@ -38,6 +39,7 @@ try:
     from azure.ai.inference import ChatCompletionsClient
     from azure.ai.inference.models import SystemMessage, UserMessage
     from azure.core.credentials import AzureKeyCredential
+
     _AZURE_INFERENCE_AVAILABLE = True
 except Exception:
     _AZURE_INFERENCE_AVAILABLE = False
@@ -45,6 +47,7 @@ except Exception:
 try:
     from azure.ai.projects import AIProjectClient
     from azure.identity import DefaultAzureCredential
+
     _AZURE_PROJECTS_AVAILABLE = True
 except Exception:
     _AZURE_PROJECTS_AVAILABLE = False
@@ -52,6 +55,7 @@ except Exception:
 # OpenAI SDK for Ollama / GitHub Models compatible endpoints
 try:
     from openai import AsyncOpenAI
+
     _OPENAI_AVAILABLE = True
 except Exception:
     _OPENAI_AVAILABLE = False
@@ -115,7 +119,12 @@ class ProductReasoningAgent:
 
         # --- Tier 1: Azure AI Inference SDK ---
         # Primary: Azure AI Inference endpoints (GitHub Models, Azure OpenAI, etc.)
-        if _AZURE_INFERENCE_AVAILABLE and endpoint and api_key and ("azure.com" in endpoint or "inference.ai" in endpoint):
+        if (
+            _AZURE_INFERENCE_AVAILABLE
+            and endpoint
+            and api_key
+            and ("azure.com" in endpoint or "inference.ai" in endpoint)
+        ):
             try:
                 model = os.environ.get("FOUNDRY_MODEL", "gpt-4o")
                 self._azure_client = ChatCompletionsClient(
@@ -163,10 +172,7 @@ class ProductReasoningAgent:
 
         # Step 1: Weight and filter sources
         weighted = self._weight_sources(raw_data_list)
-        trace.append(
-            f"Weighted {len(weighted)} sources: "
-            + ", ".join(f"{s['source']}({w:.2f})" for s, w in weighted)
-        )
+        trace.append(f"Weighted {len(weighted)} sources: " + ", ".join(f"{s['source']}({w:.2f})" for s, w in weighted))
 
         # Step 2: Resolve fields
         name, name_sources = self._resolve_name(weighted)
@@ -198,7 +204,14 @@ class ProductReasoningAgent:
 
         # Step 7: Generate citations
         citations = self._foundry_iq_ground(
-            {"name": name, "brand": brand, "category": category, "description": description, "images": images, "attributes": attributes},
+            {
+                "name": name,
+                "brand": brand,
+                "category": category,
+                "description": description,
+                "images": images,
+                "attributes": attributes,
+            },
             weighted,
         )
         trace.append(f"Generated {len(citations)} citations")
@@ -240,11 +253,18 @@ class ProductReasoningAgent:
                     trace.append("Foundry enriched fields merged")
 
         return {
-            "upc": upc, "name": name, "brand": brand, "category": category,
-            "description": description, "image_url": best_image_url,
-            "images": images, "attributes": attributes,
-            "confidence": round(confidence, 3), "status": status,
-            "citations": citations, "reasoning_trace": trace,
+            "upc": upc,
+            "name": name,
+            "brand": brand,
+            "category": category,
+            "description": description,
+            "image_url": best_image_url,
+            "images": images,
+            "attributes": attributes,
+            "confidence": round(confidence, 3),
+            "status": status,
+            "citations": citations,
+            "reasoning_trace": trace,
             "foundry_enriched": bool(foundry_result and foundry_result.get("data")),
             "foundry_sdk": (foundry_result.get("sdk") if foundry_result else None),
         }
@@ -253,9 +273,13 @@ class ProductReasoningAgent:
     # Microsoft Foundry SDK Integration
     # -----------------------------------------------------------------------
     async def _foundry_reasoning_call(
-        self, upc: str, raw_data_list: List[Dict[str, Any]],
-        current_name: str, current_brand: Optional[str],
-        current_category: Optional[str], current_description: str
+        self,
+        upc: str,
+        raw_data_list: List[Dict[str, Any]],
+        current_name: str,
+        current_brand: Optional[str],
+        current_category: Optional[str],
+        current_description: str,
     ) -> Optional[Dict[str, Any]]:
         """
         Tiered Microsoft Foundry integration:
@@ -267,7 +291,9 @@ class ProductReasoningAgent:
         model = os.environ.get("FOUNDRY_MODEL", "gpt-4o-mini")
 
         # Build structured prompt
-        prompt = self._build_llm_prompt(upc, raw_data_list, current_name, current_brand, current_category, current_description)
+        prompt = self._build_llm_prompt(
+            upc, raw_data_list, current_name, current_brand, current_category, current_description
+        )
 
         # --- Tier 1: Azure AI Inference SDK ---
         if self._azure_client and _AZURE_INFERENCE_AVAILABLE:
@@ -309,8 +335,7 @@ class ProductReasoningAgent:
         return None
 
     async def _foundry_iq_fallback(
-        self, upc: str, current_name: str, current_brand: Optional[str],
-        current_category: Optional[str]
+        self, upc: str, current_name: str, current_brand: Optional[str], current_category: Optional[str]
     ) -> Optional[Dict[str, Any]]:
         """Use the local Foundry IQ knowledge graph to enrich product data.
 
@@ -373,8 +398,13 @@ class ProductReasoningAgent:
         }
 
     def _build_llm_prompt(
-        self, upc: str, raw_data_list: List[Dict[str, Any]],
-        name: str, brand: Optional[str], category: Optional[str], description: str
+        self,
+        upc: str,
+        raw_data_list: List[Dict[str, Any]],
+        name: str,
+        brand: Optional[str],
+        category: Optional[str],
+        description: str,
     ) -> str:
         """Build a structured prompt for LLM enrichment."""
         sources_text = json.dumps(raw_data_list, indent=2, default=str)[:4000]
@@ -452,6 +482,7 @@ Rules:
                 assistant_id=agent.id,
             )
             import time
+
             for _ in range(30):
                 run = self._azure_projects_client.agents.get_run(thread_id=thread.id, run_id=run.id)
                 if run.status in ("completed", "failed", "cancelled"):
@@ -664,7 +695,9 @@ Rules:
                         merged[key] = value
         return merged
 
-    def _compute_confidence(self, weighted_sources: List[Tuple[Dict, float]], resolved_fields_count: int, name_sources: List[str]) -> float:
+    def _compute_confidence(
+        self, weighted_sources: List[Tuple[Dict, float]], resolved_fields_count: int, name_sources: List[str]
+    ) -> float:
         if not weighted_sources:
             return 0.0
 
@@ -716,11 +749,13 @@ Rules:
             if elapsed is not None:
                 note += f" ({elapsed}ms)"
 
-            citations.append({
-                "source": source_name,
-                "source_url": source_url,
-                "fields": fields,
-                "confidence": round(weight, 3),
-                "note": note,
-            })
+            citations.append(
+                {
+                    "source": source_name,
+                    "source_url": source_url,
+                    "fields": fields,
+                    "confidence": round(weight, 3),
+                    "note": note,
+                }
+            )
         return citations

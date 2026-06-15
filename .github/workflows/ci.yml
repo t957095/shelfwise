@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.12', '3.13', '3.14']
+        python-version: ['3.12']
 
     steps:
       - uses: actions/checkout@v4
@@ -25,16 +25,15 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest pytest-asyncio ruff
 
       - name: Lint with Ruff
         run: |
-          ruff check backend/
-          ruff format --check backend/
+          ruff check backend/ tests/
+          ruff format --check backend/ tests/
 
       - name: Run tests
         run: |
-          pytest tests/ -v --tb=short || echo "No tests directory yet"
+          pytest tests/ -v --tb=short
 
       - name: Check imports
         run: |

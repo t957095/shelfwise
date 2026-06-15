@@ -25,6 +25,7 @@ from PIL import Image, ImageStat
 
 try:
     from openai import AsyncOpenAI
+
     _OPENAI_AVAILABLE = True
 except Exception:
     _OPENAI_AVAILABLE = False
@@ -218,9 +219,7 @@ class VerifiedImageResult:
         self.width = width
         self.height = height
         self.content_type = content_type
-        self.overall_score = round(
-            0.45 * white_bg_score + 0.30 * quality_score + 0.25 * focus_score, 3
-        )
+        self.overall_score = round(0.45 * white_bg_score + 0.30 * quality_score + 0.25 * focus_score, 3)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -319,16 +318,19 @@ class ProductImageVerifier:
             brand_hint = f" made by {product_brand}" if product_brand else ""
             prompt = (
                 f"Does this image clearly show the product '{product_name}'{brand_hint}? "
-                "Answer with a JSON object only: {\"matches\": true/false, \"confidence\": 0.0-1.0, \"white_background\": true/false, \"issues\": [\"issue1\", ...]}"
+                'Answer with a JSON object only: {"matches": true/false, "confidence": 0.0-1.0, "white_background": true/false, "issues": ["issue1", ...]}'
             )
             response = await client.chat.completions.create(
                 model=os.environ.get("FOUNDRY_MODEL", "gpt-4o"),
                 messages=[
                     {"role": "system", "content": "You are a product image verifier."},
-                    {"role": "user", "content": [
-                        {"type": "text", "text": prompt},
-                        {"type": "image_url", "image_url": {"url": image_url}},
-                    ]},
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt},
+                            {"type": "image_url", "image_url": {"url": image_url}},
+                        ],
+                    },
                 ],
                 max_tokens=300,
                 temperature=0.2,
@@ -336,6 +338,7 @@ class ProductImageVerifier:
             content = response.choices[0].message.content
             # Parse JSON roughly
             import json
+
             try:
                 data = json.loads(content.strip().strip("`").replace("json", ""))
                 return data
