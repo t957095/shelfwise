@@ -67,7 +67,7 @@ function renderFilteredProducts(filtered) {
     if (filtered.length === 0) {
         productsGrid.innerHTML = `
             <div class="empty-state" style="grid-column: 1 / -1;">
-                <div class="icon">🔍</div>
+                <div class="icon">Search</div>
                 <h3>No matches</h3>
                 <p>Try a different search term</p>
             </div>
@@ -130,7 +130,9 @@ function setupKeyboardShortcuts() {
 
 function bindEvents() {
     submitBtn.addEventListener('click', handleSubmit);
-    demoBtn.addEventListener('click', handleDemo);
+    if (demoBtn) {
+        demoBtn.addEventListener('click', handleDemo);
+    }
     csvFileInput.addEventListener('change', (e) => {
         if (e.target.files.length > 0) previewCsv(e.target.files[0]);
     });
@@ -449,7 +451,7 @@ function renderProducts() {
     if (products.length === 0) {
         productsGrid.innerHTML = `
             <div class="empty-state" style="grid-column: 1 / -1;">
-                <div class="icon">📦</div>
+                <div class="icon">Catalog</div>
                 <h3>No products yet</h3>
                 <p>Enter UPC codes above or load the demo to get started</p>
             </div>
@@ -512,7 +514,7 @@ function renderProductCard(p) {
 
     const mainImageHtml = mainImage
         ? `<img src="${escapeHtml(mainImage.url)}" alt="${escapeHtml(p.name || 'Product image')}" class="product-image" loading="lazy" onclick="openLightbox(${escapeJsString(mainImage.url)}, ${escapeJsString(p.name || 'Product')})" style="cursor: zoom-in;" onerror="this.style.display='none'">`
-        : `<div class="product-image placeholder" role="img" aria-label="No image available">📦</div>`;
+        : `<div class="product-image placeholder" role="img" aria-label="No image available">No image</div>`;
 
     const thumbnailsHtml = thumbnails.length > 0
         ? `<div class="product-image-thumbnails" role="list" aria-label="Additional product images">` +
@@ -558,10 +560,10 @@ function renderProductCard(p) {
                 ` : ''}
                 <div class="product-actions">
                     <button class="btn btn-outline btn-sm" onclick="showReasoningTrace('${p.upc}')" aria-label="View reasoning trace for ${escapeHtml(p.name || p.upc)}">
-                        🧠 Reasoning
+                        Reasoning
                     </button>
                     <button class="btn btn-outline btn-sm" onclick="openImageManager('${p.upc}')" aria-label="Manage images for ${escapeHtml(p.name || p.upc)}">
-                        🖼️ Images
+                        Images
                     </button>
                     ${p.source_url ? `<a href="${escapeHtml(p.source_url)}" target="_blank" rel="noopener" class="btn btn-outline btn-sm">🔗 Source</a>` : ''}
                 </div>
@@ -683,7 +685,7 @@ function renderImageManager(product) {
                 ${img.url === product.image_url ? '<span class="image-manager-primary">Primary</span>' : ''}
             </div>
             <button class="btn btn-danger btn-sm" onclick="deleteManagedImage(${escapeJsString(img.url)})" aria-label="Delete image ${i + 1}">
-                🗑️ Delete
+                Delete
             </button>
         </div>
     `).join('');
@@ -803,7 +805,9 @@ async function exportPortfolio(format) {
 // Loading state
 function setLoading(loading) {
     submitBtn.disabled = loading;
-    demoBtn.disabled = loading;
+    if (demoBtn) {
+        demoBtn.disabled = loading;
+    }
     submitBtn.textContent = loading ? 'Processing...' : 'Submit UPCs';
 }
 

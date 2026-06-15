@@ -166,6 +166,19 @@ def _build_from_seed(upc: str, seed: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _is_weak_product_value(value: Any) -> bool:
+    """Return True for placeholder scraper/LLM values that POS seed data should replace."""
+    if value is None:
+        return True
+    normalized = str(value).strip().lower()
+    return (
+        normalized in {"", "unknown", "unknown product", "n/a", "none", "check digit", "product not found"}
+        or normalized.startswith("no reliable")
+        or normalized.startswith("no information")
+        or normalized.startswith("this product's details are currently unavailable")
+    )
+
+
 def _merge_seed_data(
     consolidated: Dict[str, Any],
     seed: Optional[Dict[str, Any]],
@@ -181,11 +194,34 @@ def _merge_seed_data(
 
     for field in ("name", "brand", "category", "description"):
         if seed.get(field):
-            if prefer_seed or not consolidated.get(field):
+            if prefer_seed or _is_weak_product_value(consolidated.get(field)):
                 consolidated[field] = seed[field]
+
+    category = seed.get("category")
+    upc = consolidated.get("upc", "")
+    if category and _is_weak_product_value(consolidated.get("name")):
+        consolidated["name"] = f"{category} item {upc}".strip()
+    if category and _is_weak_product_value(consolidated.get("description")):
+        consolidated["description"] = f"{category} product imported from POS UPC {upc}."
 
     if "price" in seed:
         consolidated.setdefault("attributes", {})["pos_price"] = seed["price"]
+
+    seed_fields = [k for k in ("name", "brand", "category", "description", "price") if seed.get(k)]
+    if seed_fields:
+        citations = consolidated.setdefault("citations", [])
+        if not any(c.get("source") == "POS Upload" for c in citations if isinstance(c, dict)):
+            citations.append(
+                {
+                    "source": "POS Upload",
+                    "source_url": None,
+                    "fields": seed_fields,
+                    "confidence": 0.55,
+                    "note": "Seed data from uploaded POS CSV",
+                }
+            )
+        trace = consolidated.setdefault("reasoning_trace", [])
+        trace.append("Merged POS CSV seed data")
 
     if seed.get("image_urls"):
         existing = {img.get("url") for img in consolidated.get("images", [])}
@@ -1264,6 +1300,7 @@ async def health_check():
             "foundry_integration": True,
             "foundry_mode": fiq_health.get("mode", "unknown"),
             "caching": True,
+            "learning": True,
         },
         "scrapers": {
             "core": len(SOURCE_WEIGHTS),
@@ -1273,6 +1310,16 @@ async def health_check():
         },
         "cache": upc_cache.stats(),
         "foundry_iq": fiq_health,
+    }
+
+
+@app.get("/api/learning")
+async def get_learning_stats():
+    """Return adaptive scraper source health used for future prioritization."""
+    s = get_scraper()
+    return {
+        "source_health": await s.health.stats(),
+        "note": "ShelfWise tracks per-source success rates and latency so source selection can be tuned over time.",
     }
 
 

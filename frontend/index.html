@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="ShelfWise: Turn a spreadsheet of UPCs and SKUs into a complete, market-ready product catalog with verified photos, titles, and descriptions.">
-    <meta name="theme-color" content="#0f0f23">
-    <title>ShelfWise - AI Product Portfolio Builder</title>
+    <meta name="description" content="ShelfWise turns POS UPC and SKU exports into verified product catalogs with photos, titles, descriptions, citations, and marketplace-ready exports.">
+    <meta name="theme-color" content="#f5f5f7">
+    <title>ShelfWise - Product Catalog Builder</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230071e3'/%3E%3Cpath d='M18 22h28v6H18zm0 10h28v6H18zm0 10h18v6H18z' fill='white'/%3E%3C/svg%3E">
     <link rel="preload" href="styles.css" as="style">
     <link rel="stylesheet" href="styles.css">
     <link rel="preconnect" href="/api">
@@ -16,9 +17,14 @@
     <div class="app-container">
         <!-- Header -->
         <header class="app-header" role="banner">
+            <p class="eyebrow">Product catalog automation</p>
             <h1>ShelfWise</h1>
-            <p class="subtitle">Turn a spreadsheet of UPCs and SKUs into a complete, market-ready product catalog</p>
-            <span class="badge">Microsoft Foundry Powered</span>
+            <p class="subtitle">Upload a POS export. ShelfWise finds product evidence across retailers, manufacturers, and marketplaces, then builds a verified catalog ready to publish.</p>
+            <div class="header-pills" aria-label="Core capabilities">
+                <span class="badge">POS CSV import</span>
+                <span class="badge">Multi-source verification</span>
+                <span class="badge">Marketplace exports</span>
+            </div>
         </header>
 
         <main id="main-content">
@@ -30,11 +36,11 @@
                     <label for="upc-textarea">Enter UPC Codes (one per line)</label>
                     <textarea
                         id="upc-textarea"
-                        placeholder="Enter UPC codes here..."
+                        placeholder="049000050103&#10;037000137008&#10;036000406594"
                         rows="4"
                         aria-describedby="upc-help"
                     ></textarea>
-                    <span id="upc-help" style="display: block; color: var(--text-muted); font-size: 0.8rem; margin-top: 4px;">Enter one UPC code per line, or upload a CSV file below</span>
+                    <span id="upc-help" class="field-help">Paste UPCs from a scanner, or upload a POS CSV below.</span>
                 </div>
 
                 <div class="input-group" id="drop-zone">
@@ -45,7 +51,7 @@
                         accept=".csv"
                         aria-describedby="csv-help"
                     >
-                    <span id="csv-help" style="display: block; color: var(--text-muted); font-size: 0.8rem; margin-top: 4px;">Auto-detects UPC/EAN/SKU/PLU columns. Drag and drop supported.</span>
+                    <span id="csv-help" class="field-help">Auto-detects UPC, EAN, SKU, PLU, department, price, and image URL columns.</span>
                 </div>
 
                 <div id="csv-preview" class="csv-preview" style="display: none;" aria-live="polite">
@@ -62,7 +68,7 @@
                             <option value="1000">1,000 rows</option>
                         </select>
                         <button id="csv-preview-process" class="btn btn-primary" aria-label="Process previewed CSV">
-                            <span>🚀</span> Process CSV
+                            Process CSV
                         </button>
                         <button id="csv-preview-cancel" class="btn btn-secondary" aria-label="Cancel CSV upload">
                             Cancel
@@ -72,7 +78,7 @@
 
                 <div class="button-group">
                     <button id="submit-btn" class="btn btn-primary" aria-label="Submit UPC codes for processing">
-                        <span>⚡</span> Submit UPCs
+                        Submit UPCs
                     </button>
                 </div>
             </section>
@@ -116,13 +122,13 @@
                     <h2 id="products-heading" style="margin-bottom: 0;">Products <span id="product-count">(0)</span></h2>
                     <div style="display: flex; gap: 8px;">
                         <select id="sort-select" aria-label="Sort products" style="padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.85rem; cursor: pointer;">
-                            <option value="confidence-desc">⬇️ Confidence (High-Low)</option>
-                            <option value="confidence-asc">⬆️ Confidence (Low-High)</option>
-                            <option value="name-asc">⬇️ Name (A-Z)</option>
-                            <option value="name-desc">⬆️ Name (Z-A)</option>
+                            <option value="confidence-desc">Confidence: high to low</option>
+                            <option value="confidence-asc">Confidence: low to high</option>
+                            <option value="name-asc">Name: A to Z</option>
+                            <option value="name-desc">Name: Z to A</option>
                         </select>
                         <button id="clear-btn" class="btn btn-outline btn-sm" aria-label="Clear all products">
-                            🗑️ Clear
+                            Clear
                         </button>
                     </div>
                 </div>
@@ -137,7 +143,7 @@
                 </div>
                 <div class="products-grid" id="products-grid" role="list">
                     <div class="empty-state" style="grid-column: 1 / -1;">
-                        <div class="icon">📦</div>
+                        <div class="icon">Catalog</div>
                         <h3>No products yet</h3>
                         <p>Enter UPC codes above to get started</p>
                     </div>
@@ -177,57 +183,57 @@
                 <h3 id="export-heading">Export Portfolio</h3>
                 <div class="export-grid">
                     <button class="export-btn" id="export-csv-btn" aria-label="Export as CSV">
-                        <span class="icon">📊</span>
+                        <span class="icon">CSV</span>
                         <span class="label">CSV</span>
                         <span class="hint">Generic spreadsheet</span>
                     </button>
                     <button class="export-btn" id="export-json-btn" aria-label="Export as JSON">
-                        <span class="icon">💻</span>
+                        <span class="icon">JSON</span>
                         <span class="label">JSON</span>
                         <span class="hint">Developer format</span>
                     </button>
                     <button class="export-btn" id="export-shopify-btn" aria-label="Export as Shopify CSV">
-                        <span class="icon">🛒</span>
+                        <span class="icon">Shop</span>
                         <span class="label">Shopify</span>
                         <span class="hint">Import products</span>
                     </button>
                     <button class="export-btn" id="export-amazon-btn" aria-label="Export as Amazon flat file">
-                        <span class="icon">📦</span>
+                        <span class="icon">AMZ</span>
                         <span class="label">Amazon</span>
                         <span class="hint">Seller Central</span>
                     </button>
                     <button class="export-btn" id="export-woocommerce-btn" aria-label="Export as WooCommerce CSV">
-                        <span class="icon">🏪</span>
+                        <span class="icon">Woo</span>
                         <span class="label">WooCommerce</span>
                         <span class="hint">WordPress store</span>
                     </button>
                     <button class="export-btn" id="export-ebay-btn" aria-label="Export as eBay file">
-                        <span class="icon">🔨</span>
+                        <span class="icon">eBay</span>
                         <span class="label">eBay</span>
                         <span class="hint">Turbo Lister</span>
                     </button>
                     <button class="export-btn" id="export-etsy-btn" aria-label="Export as Etsy CSV">
-                        <span class="icon">🧵</span>
+                        <span class="icon">Etsy</span>
                         <span class="label">Etsy</span>
                         <span class="hint">Handmade shop</span>
                     </button>
                     <button class="export-btn" id="export-bigcommerce-btn" aria-label="Export as BigCommerce CSV">
-                        <span class="icon">🌐</span>
+                        <span class="icon">Big</span>
                         <span class="label">BigCommerce</span>
                         <span class="hint">Enterprise store</span>
                     </button>
                     <button class="export-btn" id="export-doordash-btn" aria-label="Export as DoorDash CSV">
-                        <span class="icon">🚪</span>
+                        <span class="icon">Dash</span>
                         <span class="label">DoorDash</span>
                         <span class="hint">Menu import</span>
                     </button>
                     <button class="export-btn" id="export-ubereats-btn" aria-label="Export as Uber Eats CSV">
-                        <span class="icon">🚗</span>
+                        <span class="icon">Uber</span>
                         <span class="label">Uber Eats</span>
                         <span class="hint">Menu import</span>
                     </button>
                     <button class="export-btn" id="export-grubhub-btn" aria-label="Export as Grubhub CSV">
-                        <span class="icon">🍔</span>
+                        <span class="icon">GH</span>
                         <span class="label">Grubhub</span>
                         <span class="hint">Menu import</span>
                     </button>
@@ -259,9 +265,9 @@
                 <div class="image-manager-upload">
                     <label for="image-upload-input">Upload a new image</label>
                     <input type="file" id="image-upload-input" accept="image/*" aria-describedby="image-upload-help">
-                    <span id="image-upload-help" style="display: block; color: var(--text-muted); font-size: 0.8rem; margin-top: 4px;">JPG, PNG, WEBP, or GIF up to 10 MB.</span>
+                    <span id="image-upload-help" class="field-help">JPG, PNG, WEBP, or GIF up to 10 MB.</span>
                     <button id="image-upload-btn" class="btn btn-primary" style="margin-top: 12px;">
-                        <span>📤</span> Upload Image
+                        Upload Image
                     </button>
                 </div>
             </div>
@@ -280,11 +286,6 @@
     <!-- Toast Container -->
     <div class="toast-container" id="toast-container" aria-live="polite" aria-atomic="true"></div>
 
-    <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js').catch(() => {});
-        }
-    </script>
     <script src="app.js" defer></script>
 </body>
 </html>

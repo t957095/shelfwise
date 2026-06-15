@@ -22,6 +22,16 @@ from bs4 import BeautifulSoup
 
 logger = logging.getLogger("shelfwise.scraper")
 
+GENERIC_PRODUCT_NAMES = {
+    "check digit",
+    "barcode lookup",
+    "upc lookup",
+    "upc search",
+    "product not found",
+    "not found",
+    "unknown",
+}
+
 # Source weights used by reasoning agent
 SOURCE_WEIGHTS = {
     "Open Food Facts": 0.90,
@@ -544,6 +554,19 @@ class UPCScraper:
 
         if not name:
             return self._fail(source_name, url, {}, "Product not found")
+
+        normalized_name = re.sub(r"\s+", " ", name.strip().lower())
+        if normalized_name in GENERIC_PRODUCT_NAMES or "check digit" == normalized_name:
+            return self._fail(source_name, url, {}, f"Rejected generic non-product name: {name}")
+
+        product_signals = [
+            brand,
+            description,
+            image_urls,
+            attributes,
+        ]
+        if not any(product_signals) and source_name.lower() in {"checkdigit", "check digit"}:
+            return self._fail(source_name, url, {}, "Rejected source without product evidence")
 
         return {
             "upc": upc,
