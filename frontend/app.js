@@ -490,9 +490,27 @@ function renderProductCard(p) {
     const confidenceLabel = confidence >= 0.7 ? 'High' :
                            confidence >= 0.4 ? 'Medium' : 'Low';
 
-    const imageHtml = p.image_url
-        ? `<img src="${escapeHtml(p.image_url)}" alt="${escapeHtml(p.name || 'Product image')}" class="product-image" loading="lazy" onclick="openLightbox('${escapeHtml(p.image_url)}', '${escapeHtml(p.name || 'Product')}')" style="cursor: zoom-in;" onerror="this.style.display='none'">`
+    const images = (p.images || []).filter(img => img && img.url);
+    if (images.length === 0 && p.image_url) {
+        images.push({ url: p.image_url, source: 'Best' });
+    }
+
+    const mainImage = images[0];
+    const thumbnails = images.slice(1, 5);
+
+    const mainImageHtml = mainImage
+        ? `<img src="${escapeHtml(mainImage.url)}" alt="${escapeHtml(p.name || 'Product image')}" class="product-image" loading="lazy" onclick="openLightbox('${escapeHtml(mainImage.url)}', '${escapeHtml(p.name || 'Product')}')" style="cursor: zoom-in;" onerror="this.style.display='none'">`
         : `<div class="product-image placeholder" role="img" aria-label="No image available">📦</div>`;
+
+    const thumbnailsHtml = thumbnails.length > 0
+        ? `<div class="product-image-thumbnails" role="list" aria-label="Additional product images">` +
+          thumbnails.map((img, i) => `
+              <button class="product-thumbnail" role="listitem" aria-label="Product image ${i + 2} from ${escapeHtml(img.source || 'verified source')}" onclick="openLightbox('${escapeHtml(img.url)}', '${escapeHtml(p.name || 'Product')}')">
+                  <img src="${escapeHtml(img.url)}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'">
+              </button>
+          `).join('') +
+          `</div>`
+        : '';
 
     const attributesHtml = Object.entries(p.attributes || {})
         .slice(0, 4)
@@ -509,7 +527,8 @@ function renderProductCard(p) {
 
     return `
         <article class="product-card" tabindex="0" aria-label="${escapeHtml(p.name || 'Unknown product')}">
-            ${imageHtml}
+            ${mainImageHtml}
+            ${thumbnailsHtml}
             <div class="product-content">
                 <div class="product-header">
                     <h3 class="product-name">${escapeHtml(p.name || 'Unknown Product')}</h3>

@@ -23,7 +23,7 @@ ShelfWise transforms a list of UPC codes into a complete, exportable product por
 **Key capabilities:**
 - **282 concurrent scrapers** - 8 core sources plus a registry of 270+ additional sources, queried in parallel and limited to the top-weighted sources for speed
 - **Multi-step reasoning agent** - Jaccard deduplication, source-weighted field resolution, confidence scoring
-- **Verified product imagery** - Downloads and scores every candidate photo for white/clean backgrounds, resolution, central product focus, sharpness, frame fill, and deduplication, then selects exactly one hero image per product
+- **Verified product imagery** - Downloads and scores every candidate photo for white/clean backgrounds, resolution, central product focus, sharpness, frame fill, and source validity, then returns a ranked gallery of up to 5 verified multi-angle photos per product
 - **Foundry IQ integration** - Optional Azure OpenAI enrichment with JSON-structured responses and full citation trails
 - **Real-time SSE streaming** - Watch each UPC get processed live with progress bars
 - **11 export formats** - CSV, JSON, Shopify, Amazon, WooCommerce, eBay, Etsy, BigCommerce, DoorDash, Uber Eats, Grubhub
@@ -44,7 +44,7 @@ Open `architecture.html` in a browser to view the full interactive architecture 
 1. **Input** - User uploads CSV or enters UPCs manually
 2. **Scraping** - Core sources and top-weighted registry sources queried concurrently with rotating user-agents, retry logic, and circuit breakers
 3. **Reasoning** - ProductReasoningAgent weights sources, deduplicates names, resolves fields, merges attributes
-4. **Image Verification** - Candidate photos are scored for white/clean backgrounds, quality, focus, sharpness, frame fill, and diversity; the single best verified hero image is selected per product
+4. **Image Verification** - Candidate photos are scored for white/clean backgrounds, quality, focus, sharpness, frame fill, source validity, and perceptual diversity; a ranked gallery of up to 5 verified multi-angle images is selected per product
 5. **Foundry IQ** - If Azure OpenAI credentials are configured, the agent sends raw data for LLM-based enrichment
 6. **Storage** - SQLite database tracks jobs and stores consolidated products
 7. **Output** - Live SSE updates to frontend, product cards with verified images/citations, multi-format export

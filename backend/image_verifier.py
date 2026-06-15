@@ -339,10 +339,11 @@ class ProductImageVerifier:
         product_name: Optional[str] = None,
         product_brand: Optional[str] = None,
     ) -> List[VerifiedImageResult]:
-        """Verify a list of candidate images.
+        """Verify a list of candidate images and return a diverse, ranked gallery.
 
         candidates: list of {"url": str, "source": str, "score": float}
-        Returns: ranked list of VerifiedImageResult
+        Returns: ranked list of VerifiedImageResult with one representative per
+                 perceptual cluster, promoting multi-angle white-background shots.
         """
         tasks = []
         for cand in candidates:
@@ -355,15 +356,26 @@ class ProductImageVerifier:
             return []
 
         results = await asyncio.gather(*tasks)
-        results = [r for r in results if r is not None]
+        results = [r for r in results if r is not None and r.is_verified()]
 
-        # Deduplicate near-identical images, keeping highest score
-        deduped: List[VerifiedImageResult] = []
+        # Cluster by perceptual hash so we return distinct angles/views rather
+        # than five copies of the same pack shot.
+        clusters: List[List[VerifiedImageResult]] = []
+        CLUSTER_THRESHOLD = 8
         for r in sorted(results, key=lambda x: x.overall_score, reverse=True):
-            if not any(_hamming_distance(r.phash, existing.phash) <= 5 for existing in deduped):
-                deduped.append(r)
+            matched = False
+            for cluster in clusters:
+                if any(_hamming_distance(r.phash, c.phash) <= CLUSTER_THRESHOLD for c in cluster):
+                    cluster.append(r)
+                    matched = True
+                    break
+            if not matched:
+                clusters.append([r])
 
-        return deduped
+        # Pick the best image from each cluster, then rank clusters by that score
+        representatives = [max(cluster, key=lambda x: x.overall_score) for cluster in clusters]
+        representatives.sort(key=lambda x: x.overall_score, reverse=True)
+        return representatives
 
     async def select_hero_image(
         self,

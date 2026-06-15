@@ -60,7 +60,7 @@ try:
 except Exception:
     _OPENAI_AVAILABLE = False
 
-from backend.image_verifier import select_hero_image, select_verified_images
+from backend.image_verifier import select_verified_images
 
 SOURCE_WEIGHTS = {
     "Open Food Facts": 0.90,
@@ -664,22 +664,9 @@ Rules:
         if not candidates:
             return [], None
 
-        # Run deterministic verification pipeline and pick a single hero image.
-        # ShelfWise intentionally surfaces one verified, marketplace-ready photo
-        # per product rather than a noisy gallery.
-        try:
-            hero_dict, hero_url = await select_hero_image(
-                candidates=candidates,
-                product_name=name,
-                product_brand=brand,
-            )
-            if hero_dict and hero_url:
-                return [hero_dict], hero_url
-        except Exception as e:
-            logger = logging.getLogger("shelfwise")
-            logger.warning(f"UPC {upc}: hero image selection failed ({e}); falling back to verified gallery")
-
-        # Fallback: return the best verified gallery image if no hero passes
+        # Run deterministic verification pipeline and return a ranked gallery of
+        # verified, marketplace-ready photos. Deduplication with perceptual
+        # hashing keeps multi-angle shots while removing near-duplicates.
         try:
             verified_images, best_url = await select_verified_images(
                 candidates=candidates,
@@ -693,9 +680,9 @@ Rules:
             logger = logging.getLogger("shelfwise")
             logger.warning(f"UPC {upc}: image verification failed ({e}); falling back to source-weighted ranking")
 
-        # Last resort: use the highest source-weighted candidate raw
+        # Fallback: use the highest source-weighted candidate raw
         candidates.sort(key=lambda x: x["score"], reverse=True)
-        return candidates[:1], candidates[0]["url"] if candidates else None
+        return candidates[:5], candidates[0]["url"] if candidates else None
 
     def _merge_attributes(self, weighted_sources: List[Tuple[Dict, float]]) -> Dict[str, Any]:
         merged = {}
