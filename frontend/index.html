@@ -250,6 +250,27 @@
         </div>
     </div>
 
+    <!-- Image Manager Modal -->
+    <div class="modal-overlay" id="image-manager-overlay" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="image-manager-title">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="image-manager-title">Manage Images</h3>
+                <button class="modal-close" id="image-manager-close" aria-label="Close image manager">&times;</button>
+            </div>
+            <div class="modal-body" id="image-manager-body">
+                <div id="image-manager-list"></div>
+                <div class="image-manager-upload">
+                    <label for="image-upload-input">Upload a new image</label>
+                    <input type="file" id="image-upload-input" accept="image/*" aria-describedby="image-upload-help">
+                    <span id="image-upload-help" style="display: block; color: var(--text-muted); font-size: 0.8rem; margin-top: 4px;">JPG, PNG, WEBP, or GIF up to 10 MB.</span>
+                    <button id="image-upload-btn" class="btn btn-primary" style="margin-top: 12px;">
+                        <span>📤</span> Upload Image
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Lightbox -->
     <div class="modal-overlay" id="lightbox-overlay" role="dialog" aria-modal="true" aria-hidden="true" aria-label="Image lightbox">
         <div class="lightbox">

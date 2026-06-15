@@ -71,3 +71,6 @@ htmlcov/
 
 # Misc
 node_modules/
+
+# Uploaded product images
+backend/uploads/

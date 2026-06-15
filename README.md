@@ -134,6 +134,8 @@ GOOGLE_CX=your-programmable-search-engine-id
 | `/api/upload-csv/preview` | POST | Preview a POS CSV: detected columns and sample UPCs |
 | `/api/products` | GET | List all products |
 | `/api/products/{upc}` | GET | Get single product |
+| `/api/products/{upc}/images` | POST | Upload a product image |
+| `/api/products/{upc}/images` | DELETE | Remove a product image by URL |
 | `/api/export` | POST | Export as csv/json/shopify/amazon |
 | `/api/jobs/{job_id}` | GET | Get job status |
 | `/api/jobs/{job_id}/stream` | GET | SSE stream of live updates |

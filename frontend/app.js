@@ -136,6 +136,16 @@ function bindEvents() {
     });
     csvPreviewProcess.addEventListener('click', processPreviewedCsv);
     csvPreviewCancel.addEventListener('click', hideCsvPreview);
+
+    // Image manager modal
+    document.getElementById('image-manager-close').addEventListener('click', closeImageManager);
+    document.getElementById('image-manager-overlay').addEventListener('click', (e) => {
+        if (e.target.id === 'image-manager-overlay') closeImageManager();
+    });
+    document.getElementById('image-upload-btn').addEventListener('click', uploadManagedImage);
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeImageManager();
+    });
     document.getElementById('export-csv-btn').addEventListener('click', () => exportPortfolio('csv'));
     document.getElementById('export-json-btn').addEventListener('click', () => exportPortfolio('json'));
     document.getElementById('export-shopify-btn').addEventListener('click', () => exportPortfolio('shopify'));
@@ -548,6 +558,9 @@ function renderProductCard(p) {
                     <button class="btn btn-outline btn-sm" onclick="showReasoningTrace('${p.upc}')" aria-label="View reasoning trace for ${escapeHtml(p.name || p.upc)}">
                         🧠 Reasoning
                     </button>
+                    <button class="btn btn-outline btn-sm" onclick="openImageManager('${p.upc}')" aria-label="Manage images for ${escapeHtml(p.name || p.upc)}">
+                        🖼️ Images
+                    </button>
                     ${p.source_url ? `<a href="${escapeHtml(p.source_url)}" target="_blank" rel="noopener" class="btn btn-outline btn-sm">🔗 Source</a>` : ''}
                 </div>
             </div>
@@ -617,6 +630,116 @@ function closeModal() {
     const modal = document.getElementById('modal-overlay');
     modal.classList.remove('active');
     modal.setAttribute('aria-hidden', 'true');
+}
+
+let imageManagerUpc = null;
+
+function openImageManager(upc) {
+    const product = products.find(p => p.upc === upc);
+    if (!product) return;
+    imageManagerUpc = upc;
+    renderImageManager(product);
+    const overlay = document.getElementById('image-manager-overlay');
+    overlay.classList.add('active');
+    overlay.setAttribute('aria-hidden', 'false');
+    document.getElementById('image-manager-close').focus();
+}
+
+function closeImageManager() {
+    const overlay = document.getElementById('image-manager-overlay');
+    overlay.classList.remove('active');
+    overlay.setAttribute('aria-hidden', 'true');
+    imageManagerUpc = null;
+    document.getElementById('image-upload-input').value = '';
+}
+
+function renderImageManager(product) {
+    const list = document.getElementById('image-manager-list');
+    const images = (product.images || []).filter(img => img && img.url);
+    if (images.length === 0 && product.image_url) {
+        images.push({ url: product.image_url, source: 'Primary' });
+    }
+
+    if (images.length === 0) {
+        list.innerHTML = `<p style="color: var(--text-muted);">No images yet. Upload one below.</p>`;
+        return;
+    }
+
+    list.innerHTML = images.map((img, i) => `
+        <div class="image-manager-item">
+            <img src="${escapeHtml(img.url)}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'">
+            <div class="image-manager-meta">
+                <span class="image-manager-source">${escapeHtml(img.source || 'Verified source')}</span>
+                ${img.url === product.image_url ? '<span class="image-manager-primary">Primary</span>' : ''}
+            </div>
+            <button class="btn btn-danger btn-sm" onclick="deleteManagedImage('${escapeHtml(img.url)}')" aria-label="Delete image ${i + 1}">
+                🗑️ Delete
+            </button>
+        </div>
+    `).join('');
+}
+
+async function uploadManagedImage() {
+    if (!imageManagerUpc) return;
+    const input = document.getElementById('image-upload-input');
+    const file = input.files[0];
+    if (!file) {
+        showToast('Select an image first', 'error');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const res = await fetch(`${API_BASE}/api/products/${imageManagerUpc}/images`, {
+            method: 'POST',
+            body: formData,
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Upload failed');
+        }
+        const data = await res.json();
+        const product = products.find(p => p.upc === imageManagerUpc);
+        if (product) {
+            product.images = data.images;
+            product.image_url = data.image_url;
+        }
+        renderImageManager(product);
+        renderProducts();
+        input.value = '';
+        showToast('Image uploaded', 'info');
+    } catch (err) {
+        showToast(`Error: ${err.message}`, 'error');
+    }
+}
+
+async function deleteManagedImage(url) {
+    if (!imageManagerUpc || !url) return;
+    if (!confirm('Delete this image?')) return;
+
+    try {
+        const encoded = encodeURIComponent(url);
+        const res = await fetch(`${API_BASE}/api/products/${imageManagerUpc}/images?url=${encoded}`, {
+            method: 'DELETE',
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Delete failed');
+        }
+        const data = await res.json();
+        const product = products.find(p => p.upc === imageManagerUpc);
+        if (product) {
+            product.images = data.images;
+            product.image_url = data.image_url;
+        }
+        renderImageManager(product);
+        renderProducts();
+        showToast('Image deleted', 'info');
+    } catch (err) {
+        showToast(`Error: ${err.message}`, 'error');
+    }
 }
 
 function openLightbox(url, caption) {

@@ -24,8 +24,10 @@ ShelfWise does not return random product photos. A dedicated **image verificatio
 - **Sharpness** — edge-variance filtering rejects blurry or over-compressed photos.
 - **Source verification** — only URLs from trusted product-data sources and public image hosts are accepted; ad/tracking domains are rejected.
 - **Perceptual clustering** — images are grouped by perceptual hash so the gallery contains distinct angles and views, not five copies of the same pack shot.
+- **Name-based image search** — when a barcode has no public UPC match (common for local PLUs), ShelfWise searches the web by product name + brand and runs the same verification pipeline on those results.
+- **Manual upload & review** — users can open the image manager on any product card to delete auto-selected images or upload their own, keeping full control over the gallery.
 
-The result is a **ranked gallery of up to 5 verified, marketplace-ready photos** per product: a hero image plus additional white-background angles sourced from the web. The frontend renders the best shot prominently with thumbnail navigation; exports include the primary image and all verified alternates.
+The result is a **ranked gallery of up to 5 verified, marketplace-ready photos** per product: a hero image plus additional white-background angles sourced from the web or supplied by the user. The frontend renders the best shot prominently with thumbnail navigation; exports include the primary image and all verified alternates.
 
 ## End-to-End Workflow
 
