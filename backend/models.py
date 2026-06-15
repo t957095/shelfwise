@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class RawProductData(BaseModel):
@@ -56,6 +56,11 @@ class UPCBatchRequest(BaseModel):
 
 class ExportRequest(BaseModel):
     format: str
+    status: Optional[str] = None
+    min_confidence: Optional[float] = Field(None, ge=0.0, le=1.0)
+    q: Optional[str] = None
+    preview: bool = False
+    preview_limit: int = Field(5, ge=1, le=50)
 
 
 class JobStatus(BaseModel):

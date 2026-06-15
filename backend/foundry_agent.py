@@ -78,6 +78,22 @@ SOURCE_WEIGHTS = {
 
 STOPWORDS = {"the", "a", "an", "and", "or", "of", "in", "on", "at", "to", "for", "with", "by"}
 
+# Common category normalization map (source label → canonical marketplace category)
+CATEGORY_ALIASES = {
+    "sodas": "Beverages",
+    "colas": "Beverages",
+    "soft drinks": "Beverages",
+    "carbonated drinks": "Beverages",
+    "candy & chocolate": "Candy & Chocolate",
+    "chocolates": "Candy & Chocolate",
+    "confectionery": "Candy & Chocolate",
+    "snacks": "Snacks",
+    "chips": "Snacks",
+    "crackers": "Snacks",
+    "cookies": "Cookies & Biscuits",
+    "biscuits": "Cookies & Biscuits",
+}
+
 
 def _canonicalize(text: str) -> str:
     if not text:
@@ -85,6 +101,25 @@ def _canonicalize(text: str) -> str:
     cleaned = re.sub(r"[^\w\s]", " ", text.lower())
     words = [w for w in cleaned.split() if w not in STOPWORDS and len(w) > 1]
     return " ".join(sorted(words))
+
+
+def _normalize_key(key: str) -> str:
+    """Normalize attribute keys to snake_case conventions."""
+    if not key:
+        return key
+    key = str(key).strip().lower()
+    key = re.sub(r"[^\w\s]", " ", key)
+    key = re.sub(r"\s+", "_", key)
+    return key[:64]
+
+
+def _normalize_category(category: Optional[str]) -> Optional[str]:
+    """Map noisy category strings to canonical marketplace categories."""
+    if not category:
+        return None
+    cat = str(category).strip()
+    key = cat.lower()
+    return CATEGORY_ALIASES.get(key, cat)
 
 
 def _jaccard_similarity(a: str, b: str) -> float:
@@ -182,6 +217,7 @@ class ProductReasoningAgent:
         trace.append(f"Resolved brand: '{brand}' from {brand_sources}")
 
         category, category_sources = self._resolve_category(weighted)
+        category = _normalize_category(category)
         trace.append(f"Resolved category: '{category}' from {category_sources}")
 
         # Step 3: Merge attributes
@@ -199,7 +235,7 @@ class ProductReasoningAgent:
 
         # Step 6: Compute confidence
         resolved_count = sum(1 for x in [name, brand, category] if x)
-        confidence = self._compute_confidence(weighted, resolved_count, name_sources)
+        confidence = self._compute_confidence(weighted, resolved_count, name_sources, brand_sources, category_sources)
         trace.append(f"Computed confidence: {confidence:.2f}")
 
         # Step 7: Generate citations
@@ -586,11 +622,31 @@ Rules:
         return best_name, list(dict.fromkeys(sources_used))
 
     def _resolve_brand(self, weighted_sources: List[Tuple[Dict, float]]) -> Tuple[Optional[str], List[str]]:
+        """Resolve brand by weighted voting; prefer the highest-weight brand that has agreement."""
+        brand_votes: Dict[str, float] = {}
+        brand_sources: Dict[str, List[str]] = {}
         for data, weight in weighted_sources:
             brand = data.get("brand")
             if brand and len(str(brand).strip()) > 0:
-                return str(brand).strip(), [data.get("source", "Unknown")]
-        return None, []
+                brand_clean = str(brand).strip()
+                key = brand_clean.lower()
+                brand_votes[key] = brand_votes.get(key, 0.0) + weight
+                brand_sources.setdefault(key, []).append(data.get("source", "Unknown"))
+
+        if not brand_votes:
+            return None, []
+
+        # Pick the brand with the highest total weight, preserving original casing
+        best_key = max(brand_votes, key=brand_votes.get)
+        # Map normalized key back to the most common original casing
+        original_votes: Dict[str, float] = {}
+        for data, weight in weighted_sources:
+            brand = data.get("brand")
+            if brand and str(brand).strip().lower() == best_key:
+                original = str(brand).strip()
+                original_votes[original] = original_votes.get(original, 0.0) + weight
+        best_original = max(original_votes, key=original_votes.get)
+        return best_original, list(dict.fromkeys(brand_sources[best_key]))
 
     def _resolve_category(self, weighted_sources: List[Tuple[Dict, float]]) -> Tuple[Optional[str], List[str]]:
         for data, weight in weighted_sources:
@@ -685,17 +741,25 @@ Rules:
         return candidates[:5], candidates[0]["url"] if candidates else None
 
     def _merge_attributes(self, weighted_sources: List[Tuple[Dict, float]]) -> Dict[str, Any]:
-        merged = {}
+        merged: Dict[str, Any] = {}
+        # Merge in reverse weight order so higher-weight sources win on conflict
         for data, weight in reversed(weighted_sources):
             attrs = data.get("attributes", {})
             if isinstance(attrs, dict):
                 for key, value in attrs.items():
                     if value is not None and str(value).strip():
-                        merged[key] = value
+                        normalized_key = _normalize_key(key)
+                        if normalized_key not in merged:
+                            merged[normalized_key] = value
         return merged
 
     def _compute_confidence(
-        self, weighted_sources: List[Tuple[Dict, float]], resolved_fields_count: int, name_sources: List[str]
+        self,
+        weighted_sources: List[Tuple[Dict, float]],
+        resolved_fields_count: int,
+        name_sources: List[str],
+        brand_sources: List[str],
+        category_sources: List[str],
     ) -> float:
         if not weighted_sources:
             return 0.0
@@ -706,15 +770,17 @@ Rules:
 
         num_sources = len(weighted_sources)
         if num_sources > 1:
-            confidence += min(0.1 * (num_sources - 1), 0.3)
+            confidence += min(0.08 * (num_sources - 1), 0.24)
         else:
             confidence -= 0.2
 
         confidence += min(0.05 * resolved_fields_count, 0.15)
 
-        unique_agreeing = len(set(name_sources))
-        if unique_agreeing > 1:
-            confidence += min(0.05 * (unique_agreeing - 1), 0.15)
+        # Reward cross-source agreement on key fields
+        for sources in (name_sources, brand_sources, category_sources):
+            unique_agreeing = len(set(sources))
+            if unique_agreeing > 1:
+                confidence += min(0.04 * (unique_agreeing - 1), 0.12)
 
         source_names = {s.get("source", "") for s, _ in weighted_sources}
         if source_names == {"Demo Fallback"}:

@@ -5,10 +5,12 @@ import pytest
 from PIL import Image
 
 from backend.image_verifier import (
+    MARKETPLACE_IMAGE_RULES,
     ProductImageVerifier,
     _center_fill_score,
     _hamming_distance,
     _image_hash,
+    _marketplace_quality_score,
     _quality_score,
     _sharpness_score,
     _white_background_score,
@@ -213,3 +215,23 @@ async def test_verify_images_clusters_diverse_angles():
     assert "https://example.com/angle1.jpg" in urls or "https://example.com/angle2.jpg" in urls
     assert "https://example.com/angle3.jpg" in urls
     await verifier.close()
+
+
+def test_marketplace_quality_score_prefers_square():
+    """Marketplace quality score should prefer the target aspect ratio."""
+    square = make_image(1000, 1000, "white")
+    tall = make_image(300, 1000, "white")
+
+    square_score = _marketplace_quality_score(square, "amazon")
+    tall_score = _marketplace_quality_score(tall, "amazon")
+    assert square_score > tall_score
+    assert "amazon" in MARKETPLACE_IMAGE_RULES
+
+
+def test_marketplace_quality_score_prefers_larger():
+    """Marketplace quality score should favor images meeting marketplace minimums."""
+    small = make_image(400, 400, "white")
+    large = make_image(1200, 1200, "white")
+    small_score = _marketplace_quality_score(small, "shopify")
+    large_score = _marketplace_quality_score(large, "shopify")
+    assert large_score > small_score

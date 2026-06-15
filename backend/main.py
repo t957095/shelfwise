@@ -47,6 +47,8 @@ from backend.database import (
 )
 from backend.foundry_agent import ProductReasoningAgent
 from backend.foundry_iq import FoundryIQService, get_foundry_iq_service
+from backend.image_search import search_images_for_product
+from backend.image_verifier import select_verified_images
 from backend.models import ConsolidatedProduct, ExportRequest, UPCBatchRequest
 from backend.scraper import SOURCE_WEIGHTS, UPCScraper
 
@@ -242,6 +244,38 @@ async def process_upc(upc: str, job_id: str, seed_data: Optional[Dict[str, Any]]
             consolidated_dict = _merge_seed_data(consolidated_dict, seed_data, prefer_seed=_is_local_plu(upc))
 
         logger.info(f"UPC {upc}: consolidated with confidence {consolidated_dict.get('confidence', 0)}")
+
+        # If no verified images were found but we have a product name, try an
+        # image search by name/brand. This is especially useful for local PLUs
+        # and other store-specific codes.
+        if not consolidated_dict.get("image_url") and consolidated_dict.get("name"):
+            try:
+                query_name = consolidated_dict["name"]
+                query_brand = consolidated_dict.get("brand")
+                logger.info(f"UPC {upc}: searching images by name '{query_name}'")
+                search_candidates = await search_images_for_product(
+                    query_name,
+                    query_brand,
+                    max_results=10,
+                    client=http_client,
+                )
+                if search_candidates:
+                    verified, best_url = await select_verified_images(
+                        search_candidates,
+                        product_name=query_name,
+                        product_brand=query_brand,
+                        max_images=5,
+                        client=http_client,
+                    )
+                    if verified:
+                        consolidated_dict["images"] = verified
+                        consolidated_dict["image_url"] = best_url
+                        consolidated_dict["reasoning_trace"].append(
+                            f"Found {len(verified)} verified images via name search"
+                        )
+                        logger.info(f"UPC {upc}: selected {len(verified)} images from name search")
+            except Exception as e:
+                logger.warning(f"UPC {upc}: name-based image search failed: {e}")
 
         product = ConsolidatedProduct(**consolidated_dict)
         upsert_product(product)
@@ -600,6 +634,43 @@ async def get_single_product(upc: str):
         raise HTTPException(status_code=500, detail="Error parsing product data")
 
 
+def _filter_products_for_export(
+    products: List[Dict[str, Any]],
+    status: Optional[str] = None,
+    min_confidence: Optional[float] = None,
+    q: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """Filter products by status, confidence, and/or search query."""
+    filtered = products
+    if status:
+        filtered = [p for p in filtered if p.get("status") == status]
+    if min_confidence is not None:
+        filtered = [p for p in filtered if p.get("confidence", 0) >= min_confidence]
+    if q:
+        query = q.lower()
+        filtered = [
+            p
+            for p in filtered
+            if query in p.get("name", "").lower()
+            or query in p.get("brand", "").lower()
+            or query in p.get("category", "").lower()
+            or query in p.get("upc", "").lower()
+        ]
+    return filtered
+
+
+def _get_export_image_urls(product: Dict[str, Any], max_images: int = 5) -> List[str]:
+    """Collect verified image URLs for export, primary first."""
+    urls = []
+    if product.get("image_url"):
+        urls.append(product["image_url"])
+    for img in product.get("images", []):
+        url = img.get("url") if isinstance(img, dict) else None
+        if url and url not in urls:
+            urls.append(url)
+    return urls[:max_images]
+
+
 @app.post("/api/export")
 async def export_portfolio(request: ExportRequest):
     rows = get_all_products()
@@ -611,29 +682,49 @@ async def export_portfolio(request: ExportRequest):
         except (json.JSONDecodeError, KeyError):
             continue
 
+    products = _filter_products_for_export(products, request.status, request.min_confidence, request.q)
+
     fmt = request.format.lower()
+
+    if request.preview:
+        preview_products = products[: request.preview_limit]
+        return {
+            "preview": True,
+            "format": fmt,
+            "total": len(products),
+            "preview_count": len(preview_products),
+            "filters": {
+                "status": request.status,
+                "min_confidence": request.min_confidence,
+                "q": request.q,
+            },
+            "products": preview_products,
+        }
 
     if fmt == "csv":
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(
-            ["upc", "name", "brand", "category", "description", "image_url", "confidence", "status", "citations"]
-        )
+        header = ["upc", "name", "brand", "category", "description", "image_url", "confidence", "status", "citations"]
+        for i in range(2, 6):
+            header.append(f"image_{i}")
+        writer.writerow(header)
         for p in products:
             citations_str = "; ".join(f"{c['source']}:{','.join(c['fields'])}" for c in p.get("citations", []))
-            writer.writerow(
-                [
-                    p.get("upc", ""),
-                    p.get("name", ""),
-                    p.get("brand", ""),
-                    p.get("category", ""),
-                    p.get("description", ""),
-                    p.get("image_url", ""),
-                    p.get("confidence", 0),
-                    p.get("status", ""),
-                    citations_str,
-                ]
-            )
+            image_urls = _get_export_image_urls(p, max_images=5)
+            row = [
+                p.get("upc", ""),
+                p.get("name", ""),
+                p.get("brand", ""),
+                p.get("category", ""),
+                p.get("description", ""),
+                image_urls[0] if image_urls else "",
+                p.get("confidence", 0),
+                p.get("status", ""),
+                citations_str,
+            ]
+            for i in range(1, 5):
+                row.append(image_urls[i] if i < len(image_urls) else "")
+            writer.writerow(row)
         output.seek(0)
         return StreamingResponse(
             io.BytesIO(output.getvalue().encode("utf-8")),
@@ -651,52 +742,55 @@ async def export_portfolio(request: ExportRequest):
     elif fmt == "shopify":
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(
-            [
-                "Handle",
-                "Title",
-                "Body (HTML)",
-                "Vendor",
-                "Type",
-                "Tags",
-                "Published",
-                "Option1 Name",
-                "Option1 Value",
-                "Variant SKU",
-                "Variant Grams",
-                "Variant Inventory Tracker",
-                "Variant Inventory Qty",
-                "Variant Inventory Policy",
-                "Variant Fulfillment Service",
-                "Variant Price",
-                "Variant Compare At Price",
-                "Image Src",
-            ]
-        )
+        header = [
+            "Handle",
+            "Title",
+            "Body (HTML)",
+            "Vendor",
+            "Type",
+            "Tags",
+            "Published",
+            "Option1 Name",
+            "Option1 Value",
+            "Variant SKU",
+            "Variant Grams",
+            "Variant Inventory Tracker",
+            "Variant Inventory Qty",
+            "Variant Inventory Policy",
+            "Variant Fulfillment Service",
+            "Variant Price",
+            "Variant Compare At Price",
+            "Image Src",
+        ]
+        for i in range(2, 6):
+            header.append(f"Image Src {i}")
+        writer.writerow(header)
         for p in products:
             handle = p.get("upc", "").lower()
-            writer.writerow(
-                [
-                    handle,
-                    p.get("name", ""),
-                    p.get("description", ""),
-                    p.get("brand", ""),
-                    p.get("category", ""),
-                    f"upc-{p.get('upc', '')}, shelfwise",
-                    "TRUE",
-                    "Title",
-                    "Default Title",
-                    p.get("upc", ""),
-                    "0",
-                    "",
-                    "0",
-                    "deny",
-                    "manual",
-                    "",
-                    "",
-                    p.get("image_url", ""),
-                ]
-            )
+            image_urls = _get_export_image_urls(p, max_images=5)
+            row = [
+                handle,
+                p.get("name", ""),
+                p.get("description", ""),
+                p.get("brand", ""),
+                p.get("category", ""),
+                f"upc-{p.get('upc', '')}, shelfwise",
+                "TRUE",
+                "Title",
+                "Default Title",
+                p.get("upc", ""),
+                "0",
+                "",
+                "0",
+                "deny",
+                "manual",
+                "",
+                "",
+                image_urls[0] if image_urls else "",
+            ]
+            for i in range(1, 5):
+                row.append(image_urls[i] if i < len(image_urls) else "")
+            writer.writerow(row)
         output.seek(0)
         return StreamingResponse(
             io.BytesIO(output.getvalue().encode("utf-8")),
@@ -707,39 +801,42 @@ async def export_portfolio(request: ExportRequest):
     elif fmt == "amazon":
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(
-            [
-                "sku",
-                "product-id",
-                "product-id-type",
-                "item-name",
-                "brand-name",
-                "manufacturer",
-                "product-description",
-                "item-type",
-                "update-delete",
-                "standard-price",
-                "quantity",
-                "main-image-url",
-            ]
-        )
+        header = [
+            "sku",
+            "product-id",
+            "product-id-type",
+            "item-name",
+            "brand-name",
+            "manufacturer",
+            "product-description",
+            "item-type",
+            "update-delete",
+            "standard-price",
+            "quantity",
+            "main-image-url",
+        ]
+        for i in range(2, 6):
+            header.append(f"other-image-url-{i - 1}")
+        writer.writerow(header)
         for p in products:
-            writer.writerow(
-                [
-                    p.get("upc", ""),
-                    p.get("upc", ""),
-                    "3",
-                    p.get("name", ""),
-                    p.get("brand", ""),
-                    p.get("brand", ""),
-                    p.get("description", ""),
-                    p.get("category", ""),
-                    "",
-                    "",
-                    "",
-                    p.get("image_url", ""),
-                ]
-            )
+            image_urls = _get_export_image_urls(p, max_images=5)
+            row = [
+                p.get("upc", ""),
+                p.get("upc", ""),
+                "3",
+                p.get("name", ""),
+                p.get("brand", ""),
+                p.get("brand", ""),
+                p.get("description", ""),
+                p.get("category", ""),
+                "",
+                "",
+                "",
+                image_urls[0] if image_urls else "",
+            ]
+            for i in range(1, 5):
+                row.append(image_urls[i] if i < len(image_urls) else "")
+            writer.writerow(row)
         output.seek(0)
         return StreamingResponse(
             io.BytesIO(output.getvalue().encode("utf-8")),
@@ -754,6 +851,7 @@ async def export_portfolio(request: ExportRequest):
             ["ID", "Type", "SKU", "Name", "Published", "Description", "Short description", "Categories", "Images"]
         )
         for p in products:
+            image_urls = _get_export_image_urls(p, max_images=5)
             writer.writerow(
                 [
                     "",
@@ -764,7 +862,7 @@ async def export_portfolio(request: ExportRequest):
                     p.get("description", ""),
                     "",
                     p.get("category", ""),
-                    p.get("image_url", ""),
+                    ",".join(image_urls),
                 ]
             )
         output.seek(0)
@@ -777,49 +875,52 @@ async def export_portfolio(request: ExportRequest):
     elif fmt == "ebay":
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(
-            [
-                "*Action(SiteID=US|Country=US|Currency=USD|Version=941|CC=ISO-8859-1)",
-                "ItemID",
-                "Title",
-                "Category",
-                "PicURL",
-                "Description",
-                "Format",
-                "Duration",
-                "StartPrice",
-                "Quantity",
-                "Location",
-                "ShippingType",
-                "ShippingService-1:Option",
-                "ShippingService-1:Cost",
-                "ReturnsAcceptedOption",
-                "RefundOption",
-                "ReturnPolicyDescription",
-            ]
-        )
+        header = [
+            "*Action(SiteID=US|Country=US|Currency=USD|Version=941|CC=ISO-8859-1)",
+            "ItemID",
+            "Title",
+            "Category",
+            "PicURL",
+            "Description",
+            "Format",
+            "Duration",
+            "StartPrice",
+            "Quantity",
+            "Location",
+            "ShippingType",
+            "ShippingService-1:Option",
+            "ShippingService-1:Cost",
+            "ReturnsAcceptedOption",
+            "RefundOption",
+            "ReturnPolicyDescription",
+        ]
+        for i in range(2, 6):
+            header.append(f"PicURL{i}")
+        writer.writerow(header)
         for p in products:
-            writer.writerow(
-                [
-                    "Add",
-                    "",
-                    p.get("name", ""),
-                    p.get("category", ""),
-                    p.get("image_url", ""),
-                    p.get("description", ""),
-                    "FixedPrice",
-                    "GTC",
-                    "",
-                    "1",
-                    "US",
-                    "Flat",
-                    "USPSMedia",
-                    "0",
-                    "ReturnsAccepted",
-                    "MoneyBack",
-                    "",
-                ]
-            )
+            image_urls = _get_export_image_urls(p, max_images=5)
+            row = [
+                "Add",
+                "",
+                p.get("name", ""),
+                p.get("category", ""),
+                image_urls[0] if image_urls else "",
+                p.get("description", ""),
+                "FixedPrice",
+                "GTC",
+                "",
+                "1",
+                "US",
+                "Flat",
+                "USPSMedia",
+                "0",
+                "ReturnsAccepted",
+                "MoneyBack",
+                "",
+            ]
+            for i in range(1, 5):
+                row.append(image_urls[i] if i < len(image_urls) else "")
+            writer.writerow(row)
         output.seek(0)
         return StreamingResponse(
             io.BytesIO(output.getvalue().encode("utf-8")),
@@ -1103,11 +1204,13 @@ async def search_endpoint(
 async def metrics():
     """Performance metrics for monitoring."""
     avg_scrape = sum(_scrape_times) / len(_scrape_times) if _scrape_times else 0
+    scraper_health = await scraper.health.stats() if scraper else {}
     return {
         "avg_scrape_time_sec": round(avg_scrape, 3),
         "total_scrapes": len(_scrape_times),
         "cache_stats": upc_cache.stats(),
         "active_circuits": {name: cb.state for name, cb in (scraper.circuits.items() if scraper else {})},
+        "scraper_health": scraper_health,
     }
 
 

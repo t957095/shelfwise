@@ -1,7 +1,8 @@
 from fastapi.testclient import TestClient
 
-from backend.database import delete_all_products
+from backend.database import delete_all_products, upsert_product
 from backend.main import app
+from backend.models import ConsolidatedProduct
 
 client = TestClient(app)
 
@@ -119,3 +120,66 @@ def test_styles_css_served():
     """Test that styles.css is accessible."""
     response = client.get("/app/styles.css")
     assert response.status_code == 200
+
+
+def _seed_products():
+    delete_all_products()
+    products = [
+        ConsolidatedProduct(
+            upc="111111111111",
+            name="Alpha Product",
+            brand="AlphaBrand",
+            category="Beverages",
+            description="Alpha desc",
+            confidence=0.95,
+            status="complete",
+        ),
+        ConsolidatedProduct(
+            upc="222222222222",
+            name="Beta Product",
+            brand="BetaBrand",
+            category="Snacks",
+            description="Beta desc",
+            confidence=0.45,
+            status="partial",
+        ),
+    ]
+    for p in products:
+        upsert_product(p)
+
+
+def test_export_preview_filters():
+    """Test export preview with status and confidence filters."""
+    _seed_products()
+    response = client.post(
+        "/api/export",
+        json={"format": "json", "preview": True, "preview_limit": 10, "status": "complete"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["preview"] is True
+    assert data["total"] == 1
+    assert data["products"][0]["upc"] == "111111111111"
+
+
+def test_export_preview_min_confidence():
+    """Test export preview filtered by min_confidence."""
+    _seed_products()
+    response = client.post(
+        "/api/export",
+        json={"format": "json", "preview": True, "min_confidence": 0.5},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 1
+    assert data["products"][0]["upc"] == "111111111111"
+
+
+def test_export_csv_filtered():
+    """Test CSV export respects filters."""
+    _seed_products()
+    response = client.post("/api/export", json={"format": "csv", "status": "complete"})
+    assert response.status_code == 200
+    text = response.text
+    assert "Alpha Product" in text
+    assert "Beta Product" not in text

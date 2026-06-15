@@ -130,3 +130,18 @@ async def test_rate_limiting(scraper):
 
     assert result1["success"] is False
     assert result2["success"] is False
+
+
+@pytest.mark.asyncio
+async def test_scraper_health_tracks_success_and_failure(scraper):
+    """ScraperHealth should record per-source success/failure rates."""
+    await scraper.health.record("Open Food Facts", True, 0.1)
+    await scraper.health.record("Open Food Facts", True, 0.2)
+    await scraper.health.record("Open Food Facts", False, 0.3)
+    await scraper.health.record("UPCItemDB", False, 0.5)
+
+    stats = await scraper.health.stats()
+    assert stats["Open Food Facts"]["calls"] == 3
+    assert abs(stats["Open Food Facts"]["success_rate"] - 2 / 3) < 0.01
+    assert stats["UPCItemDB"]["success_rate"] == 0.0
+    assert "avg_latency_ms" in stats["Open Food Facts"]

@@ -51,9 +51,57 @@ ROTATING_HEADERS = [
     },
 ]
 
-# Circuit breaker state
-CIRCUIT_FAILURE_THRESHOLD = 5
-CIRCUIT_RECOVERY_TIMEOUT = 60.0
+# Circuit breaker state (overridable via env vars)
+CIRCUIT_FAILURE_THRESHOLD = int(os.environ.get("SHELFWISE_CIRCUIT_FAILURE_THRESHOLD", "5"))
+CIRCUIT_RECOVERY_TIMEOUT = float(os.environ.get("SHELFWISE_CIRCUIT_RECOVERY_TIMEOUT", "60.0"))
+
+# Retry / timeout configuration
+DEFAULT_RETRIES = int(os.environ.get("SHELFWISE_RETRIES", "2"))
+DEFAULT_TIMEOUT = float(os.environ.get("SHELFWISE_REQUEST_TIMEOUT", "10.0"))
+
+
+class ScraperHealth:
+    """Track per-source success/failure rates for adaptive scraping decisions."""
+
+    def __init__(self):
+        self._calls: Dict[str, int] = {}
+        self._successes: Dict[str, int] = {}
+        self._failures: Dict[str, int] = {}
+        self._latencies: Dict[str, List[float]] = {}
+        self._lock = asyncio.Lock()
+
+    async def record(self, source: str, success: bool, latency: float):
+        async with self._lock:
+            self._calls[source] = self._calls.get(source, 0) + 1
+            self._latencies.setdefault(source, []).append(latency)
+            # Keep last 100 latency samples
+            self._latencies[source] = self._latencies[source][-100:]
+            if success:
+                self._successes[source] = self._successes.get(source, 0) + 1
+            else:
+                self._failures[source] = self._failures.get(source, 0) + 1
+
+    async def stats(self) -> Dict[str, Dict[str, Any]]:
+        async with self._lock:
+            result = {}
+            for source in self._calls:
+                calls = self._calls[source]
+                successes = self._successes.get(source, 0)
+                failures = self._failures.get(source, 0)
+                latencies = self._latencies.get(source, [])
+                result[source] = {
+                    "calls": calls,
+                    "successes": successes,
+                    "failures": failures,
+                    "success_rate": round(successes / calls, 3) if calls else 0.0,
+                    "avg_latency_ms": round(sum(latencies) / len(latencies) * 1000, 1) if latencies else 0.0,
+                }
+            return result
+
+    def success_rate(self, source: str) -> float:
+        calls = self._calls.get(source, 0)
+        successes = self._successes.get(source, 0)
+        return successes / calls if calls else 1.0
 
 # Demo fallback data for hackathon demo
 DEMO_FALLBACK_DATA = {
@@ -152,12 +200,13 @@ class CircuitBreaker:
 
 
 class UPCScraper:
-    def __init__(self, client: httpx.AsyncClient):
+    def __init__(self, client: httpx.AsyncClient, health: Optional[ScraperHealth] = None):
         self.client = client
         self.request_count = 0
         self._inflight: Dict[str, asyncio.Future] = {}
         self._inflight_lock = asyncio.Lock()
         self.circuits: Dict[str, CircuitBreaker] = {}
+        self.health = health or ScraperHealth()
 
     def _get_circuit(self, name: str) -> CircuitBreaker:
         if name not in self.circuits:
@@ -169,8 +218,16 @@ class UPCScraper:
         self.request_count += 1
         return headers
 
-    async def _get_with_retry(self, url: str, timeout: float = 10.0, retries: int = 2, **kwargs) -> httpx.Response:
-        """GET with exponential backoff retry."""
+    async def _get_with_retry(
+        self,
+        url: str,
+        timeout: Optional[float] = None,
+        retries: Optional[int] = None,
+        **kwargs,
+    ) -> httpx.Response:
+        """GET with exponential backoff retry and error classification."""
+        timeout = timeout if timeout is not None else DEFAULT_TIMEOUT
+        retries = retries if retries is not None else DEFAULT_RETRIES
         last_error = None
         # Build headers from kwarg or default
         headers = kwargs.pop("headers", DEFAULT_HEADERS)
@@ -185,8 +242,14 @@ class UPCScraper:
                 return response
             except Exception as e:
                 last_error = e
-                if attempt < retries:
-                    wait = 2**attempt
+                # Classify errors: don't retry client errors (4xx) except 429
+                should_retry = attempt < retries
+                if isinstance(e, httpx.HTTPStatusError):
+                    status = e.response.status_code
+                    if 400 <= status < 500 and status != 429:
+                        should_retry = False
+                if should_retry:
+                    wait = min(2**attempt, 30)  # cap backoff at 30s
                     logger.warning(f"Retry {attempt + 1}/{retries} for {url}: {e}")
                     await asyncio.sleep(wait)
         raise last_error
@@ -497,16 +560,19 @@ class UPCScraper:
         }
 
     async def _safe_scrape(self, name: str, scrape_fn, upc: str) -> Dict[str, Any]:
-        """Wrap scraper in circuit breaker + try/except + timing."""
+        """Wrap scraper in circuit breaker + try/except + timing + health tracking."""
         start = time.time()
         try:
             cb = self._get_circuit(name)
             result = await cb.call(scrape_fn, upc)
-            result["_elapsed_ms"] = round((time.time() - start) * 1000, 1)
+            elapsed = time.time() - start
+            result["_elapsed_ms"] = round(elapsed * 1000, 1)
+            await self.health.record(name, result.get("success", True), elapsed)
             return result
         except Exception as e:
-            elapsed = round((time.time() - start) * 1000, 1)
-            logger.warning(f"Scraper {name} failed for {upc} ({elapsed}ms): {e}")
+            elapsed = time.time() - start
+            logger.warning(f"Scraper {name} failed for {upc} ({elapsed*1000:.1f}ms): {e}")
+            await self.health.record(name, False, elapsed)
             return {
                 "upc": upc,
                 "source": name,
@@ -520,7 +586,7 @@ class UPCScraper:
                 "raw": {},
                 "success": False,
                 "error": str(e),
-                "_elapsed_ms": elapsed,
+                "_elapsed_ms": round(elapsed * 1000, 1),
             }
 
     async def _open_food_facts(self, upc: str) -> Dict[str, Any]:

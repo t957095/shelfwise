@@ -37,6 +37,22 @@ MIN_WIDTH = 300
 MIN_HEIGHT = 300
 MAX_ASPECT_RATIO = 3.0  # width / height
 
+# Marketplace-specific image guidelines (target aspect ratio + min dimensions)
+MARKETPLACE_IMAGE_RULES = {
+    "amazon": {"aspect": 1.0, "min_width": 500, "min_height": 500, "name": "Amazon"},
+    "shopify": {"aspect": 1.0, "min_width": 800, "min_height": 800, "name": "Shopify"},
+    "ebay": {"aspect": 1.0, "min_width": 500, "min_height": 500, "name": "eBay"},
+    "etsy": {"aspect": 0.8, "min_width": 1000, "min_height": 1000, "name": "Etsy"},
+    "doordash": {"aspect": 1.0, "min_width": 600, "min_height": 600, "name": "DoorDash"},
+    "ubereats": {"aspect": 1.0, "min_width": 600, "min_height": 600, "name": "Uber Eats"},
+    "grubhub": {"aspect": 1.0, "min_width": 600, "min_height": 600, "name": "Grubhub"},
+    "woocommerce": {"aspect": 1.0, "min_width": 600, "min_height": 600, "name": "WooCommerce"},
+    "bigcommerce": {"aspect": 1.0, "min_width": 500, "min_height": 500, "name": "BigCommerce"},
+}
+
+# Perceptual-hash deduplication threshold (configurable via env)
+DEDUP_THRESHOLD = int(os.environ.get("SHELFWISE_IMAGE_DEDUP_THRESHOLD", "8"))
+
 # Background scoring thresholds
 WHITE_BG_THRESHOLD = 240  # 0-255; corner pixels must average above this
 CLEAN_EDGE_RATIO = 0.75  # fraction of edge pixels that must be near-white
@@ -61,10 +77,18 @@ def _is_valid_image_url(url: str) -> bool:
 
 
 async def _download_image(client: httpx.AsyncClient, url: str, timeout: float = 15.0) -> Optional[Image.Image]:
-    """Download and open an image."""
+    """Download and open an image with content-type validation."""
     try:
         response = await client.get(url, timeout=timeout, follow_redirects=True)
         response.raise_for_status()
+        # Validate content type when explicitly available
+        content_type = getattr(response, "headers", None)
+        if content_type is not None:
+            content_type = str(content_type.get("content-type", "")).lower()
+            # Only reject if we have a clear non-image content type
+            if content_type and "/" in content_type and not any(t in content_type for t in ("image/", "application/octet-stream")):
+                logger.debug(f"Rejecting non-image content-type {content_type} for {url}")
+                return None
         content = response.content
         if not content:
             return None
@@ -149,6 +173,29 @@ def _quality_score(img: Image.Image) -> float:
     # Resolution score: larger is better, with diminishing returns
     mpixels = (width * height) / 1_000_000
     resolution_score = min(mpixels / 1.0, 1.0)
+
+    return round(0.5 * aspect_score + 0.5 * resolution_score, 3)
+
+
+def _marketplace_quality_score(img: Image.Image, marketplace: str) -> float:
+    """Score image quality for a specific marketplace's guidelines."""
+    rules = MARKETPLACE_IMAGE_RULES.get(marketplace.lower())
+    if not rules:
+        return _quality_score(img)
+
+    width, height = img.size
+    aspect = width / max(height, 1)
+    target_aspect = rules["aspect"]
+
+    # Aspect ratio fit
+    aspect_diff = abs(aspect - target_aspect)
+    aspect_score = max(0.0, 1.0 - aspect_diff)
+
+    # Resolution fit
+    min_w, min_h = rules["min_width"], rules["min_height"]
+    width_score = min(width / min_w, 1.0) if width >= min_w else 0.0
+    height_score = min(height / min_h, 1.0) if height >= min_h else 0.0
+    resolution_score = 0.5 * width_score + 0.5 * height_score
 
     return round(0.5 * aspect_score + 0.5 * resolution_score, 3)
 
@@ -338,10 +385,12 @@ class ProductImageVerifier:
         candidates: List[Dict[str, Any]],
         product_name: Optional[str] = None,
         product_brand: Optional[str] = None,
+        marketplace: Optional[str] = None,
     ) -> List[VerifiedImageResult]:
         """Verify a list of candidate images and return a diverse, ranked gallery.
 
         candidates: list of {"url": str, "source": str, "score": float}
+        marketplace: optional marketplace key to tune aspect ratio / resolution scoring
         Returns: ranked list of VerifiedImageResult with one representative per
                  perceptual cluster, promoting multi-angle white-background shots.
         """
@@ -350,7 +399,7 @@ class ProductImageVerifier:
             url = cand.get("url", "")
             if not _is_valid_image_url(url):
                 continue
-            tasks.append(self._verify_one(url, cand.get("source", "Unknown")))
+            tasks.append(self._verify_one(url, cand.get("source", "Unknown"), marketplace=marketplace))
 
         if not tasks:
             return []
@@ -361,11 +410,10 @@ class ProductImageVerifier:
         # Cluster by perceptual hash so we return distinct angles/views rather
         # than five copies of the same pack shot.
         clusters: List[List[VerifiedImageResult]] = []
-        CLUSTER_THRESHOLD = 8
         for r in sorted(results, key=lambda x: x.overall_score, reverse=True):
             matched = False
             for cluster in clusters:
-                if any(_hamming_distance(r.phash, c.phash) <= CLUSTER_THRESHOLD for c in cluster):
+                if any(_hamming_distance(r.phash, c.phash) <= DEDUP_THRESHOLD for c in cluster):
                     cluster.append(r)
                     matched = True
                     break
@@ -382,20 +430,23 @@ class ProductImageVerifier:
         candidates: List[Dict[str, Any]],
         product_name: Optional[str] = None,
         product_brand: Optional[str] = None,
+        marketplace: Optional[str] = None,
     ) -> Optional[VerifiedImageResult]:
         """Return the single best hero image, or None if none passes the hero bar."""
-        verified = await self.verify_images(candidates, product_name, product_brand)
+        verified = await self.verify_images(candidates, product_name, product_brand, marketplace=marketplace)
         heroes = [v for v in verified if v.is_hero()]
         heroes.sort(key=lambda x: x.overall_score, reverse=True)
         return heroes[0] if heroes else None
 
-    async def _verify_one(self, url: str, source: str) -> Optional[VerifiedImageResult]:
+    async def _verify_one(
+        self, url: str, source: str, marketplace: Optional[str] = None
+    ) -> Optional[VerifiedImageResult]:
         img = await _download_image(self.client, url)
         if img is None:
             return None
         try:
             white = _white_background_score(img)
-            quality = _quality_score(img)
+            quality = _marketplace_quality_score(img, marketplace) if marketplace else _quality_score(img)
             focus = _focus_score(img)
             center_fill = _center_fill_score(img)
             sharpness = _sharpness_score(img)
@@ -475,6 +526,7 @@ async def select_verified_images(
     product_brand: Optional[str] = None,
     max_images: int = 5,
     client: Optional[httpx.AsyncClient] = None,
+    marketplace: Optional[str] = None,
 ) -> Tuple[List[Dict[str, Any]], Optional[str]]:
     """Convenience function: verify candidates and return top images + best URL.
 
@@ -482,7 +534,7 @@ async def select_verified_images(
     """
     verifier = ProductImageVerifier(client=client)
     try:
-        verified = await verifier.verify_images(candidates, product_name, product_brand)
+        verified = await verifier.verify_images(candidates, product_name, product_brand, marketplace=marketplace)
         verified = [v for v in verified if v.is_verified()]
         verified.sort(key=lambda x: x.overall_score, reverse=True)
         top = verified[:max_images]
@@ -498,6 +550,7 @@ async def select_hero_image(
     product_name: Optional[str] = None,
     product_brand: Optional[str] = None,
     client: Optional[httpx.AsyncClient] = None,
+    marketplace: Optional[str] = None,
 ) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
     """Convenience function: return exactly one hero image dict and its URL.
 
@@ -508,16 +561,22 @@ async def select_hero_image(
     """
     verifier = ProductImageVerifier(client=client)
     try:
-        hero = await verifier.select_hero_image(candidates, product_name, product_brand)
+        hero = await verifier.select_hero_image(
+            candidates, product_name, product_brand, marketplace=marketplace
+        )
         if hero:
             return hero.to_dict(), hero.url
 
         # Fallback: return the single best verified image
-        verified = await verifier.verify_images(candidates, product_name, product_brand)
+        verified = await verifier.verify_images(
+            candidates, product_name, product_brand, marketplace=marketplace
+        )
         verified = [v for v in verified if v.is_verified()]
         if not verified:
             # Last resort: return the highest-scoring candidate even if unverified
-            all_scored = await verifier.verify_images(candidates, product_name, product_brand)
+            all_scored = await verifier.verify_images(
+                candidates, product_name, product_brand, marketplace=marketplace
+            )
             if all_scored:
                 best = max(all_scored, key=lambda x: x.overall_score)
                 return best.to_dict(), best.url
