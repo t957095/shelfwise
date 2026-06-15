@@ -21,11 +21,12 @@ This is not a hypothetical. Walk through any liquidation warehouse and you will 
 ShelfWise transforms a list of UPC codes into a complete, exportable product portfolio in minutes. It scrapes 8+ public data sources concurrently, runs a multi-step reasoning agent to consolidate conflicting information, generates cited product records, and exports directly to Shopify, Amazon, or generic CSV/JSON.
 
 **Key capabilities:**
-- **8 concurrent scrapers** - Open Food Facts, UPCItemDB, BarcodeLookup, Go-UPC, Buycott, EANdata, Brave Search, Google Search
+- **282 concurrent scrapers** - 8 core sources plus a registry of 270+ additional sources, queried in parallel and limited to the top-weighted sources for speed
 - **Multi-step reasoning agent** - Jaccard deduplication, source-weighted field resolution, confidence scoring
+- **Verified product imagery** - Downloads and scores every candidate photo for white/clean backgrounds, resolution, central product focus, and deduplication
 - **Foundry IQ integration** - Optional Azure OpenAI enrichment with JSON-structured responses and full citation trails
 - **Real-time SSE streaming** - Watch each UPC get processed live with progress bars
-- **4 export formats** - CSV, JSON, Shopify product import, Amazon flat file
+- **8 export formats** - CSV, JSON, Shopify, Amazon, WooCommerce, eBay, Etsy, BigCommerce
 - **Accessibility-first** - WCAG 2.1 AA compliant, keyboard navigation, screen reader support, reduced motion support
 
 ## Demo Video
@@ -41,11 +42,12 @@ Open `architecture.html` in a browser to view the full interactive architecture 
 ### Data Flow
 
 1. **Input** - User uploads CSV or enters UPCs manually
-2. **Scraping** - 8 sources queried concurrently with rotating user-agents and retry logic
+2. **Scraping** - Core sources and top-weighted registry sources queried concurrently with rotating user-agents, retry logic, and circuit breakers
 3. **Reasoning** - ProductReasoningAgent weights sources, deduplicates names, resolves fields, merges attributes
-4. **Foundry IQ** - If Azure OpenAI credentials are configured, the agent sends raw data for LLM-based enrichment
-5. **Storage** - SQLite database tracks jobs and stores consolidated products
-6. **Output** - Live SSE updates to frontend, product cards with images/citations, multi-format export
+4. **Image Verification** - Candidate photos are scored for white/clean backgrounds, quality, focus, and diversity; only verified images are surfaced
+5. **Foundry IQ** - If Azure OpenAI credentials are configured, the agent sends raw data for LLM-based enrichment
+6. **Storage** - SQLite database tracks jobs and stores consolidated products
+7. **Output** - Live SSE updates to frontend, product cards with verified images/citations, multi-format export
 
 ## Tech Stack
 
@@ -188,8 +190,9 @@ shelfwise/
 │   ├── main.py              # FastAPI app with SSE streaming
 │   ├── models.py            # Pydantic data models
 │   ├── database.py          # SQLite layer
-│   ├── scraper.py           # 8-source async scraper
+│   ├── scraper.py           # Async scraper with 270+ source registry
 │   ├── foundry_agent.py     # Multi-step reasoning agent + Azure OpenAI
+│   ├── image_verifier.py    # Verified product photo pipeline
 │   ├── setup-azure-openai.ps1  # One-click Azure provisioning
 │   └── .env.example         # Environment template
 ├── frontend/

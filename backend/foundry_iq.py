@@ -8,16 +8,16 @@ When AZURE_FOUNDRY_ENDPOINT is set, this module proxies to the real service.
 Otherwise, it runs a local knowledge graph + semantic retrieval engine.
 """
 
-import os
-import json
-import re
-import math
-from typing import Dict, List, Optional, Any, Callable
-from dataclasses import dataclass, field, asdict
-from datetime import datetime, timedelta
-from collections import defaultdict
-import sqlite3
 import hashlib
+import json
+import math
+import os
+import re
+import sqlite3
+from collections import defaultdict
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 # ---------------------------------------------------------------------------
 # Data models

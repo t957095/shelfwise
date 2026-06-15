@@ -9,14 +9,15 @@ Features:
 - Structured logging per scrape
 """
 
-import httpx
-import os
-import re
 import asyncio
 import logging
+import os
+import re
 import time
-from typing import List, Dict, Optional, Any, Callable
+from typing import Any, Callable, Dict, List, Optional
 from urllib.parse import urlparse
+
+import httpx
 from bs4 import BeautifulSoup
 
 logger = logging.getLogger("shelfwise.scraper")
@@ -132,7 +133,7 @@ class CircuitBreaker:
                     self.failures = 0
                     logger.info(f"Circuit breaker {self.name}: closed")
             return result
-        except Exception as e:
+        except Exception:
             async with self._lock:
                 self.failures += 1
                 self.last_failure_time = time.time()
@@ -223,18 +224,18 @@ class UPCScraper:
             ("Brave Search", self._brave_search),
             ("Google Search", self._google_search),
         ]
-        
-        # Dynamic registry scrapers (100+ additional sources)
-        registry_sources = self._get_registry_sources()
+
+        # Dynamic registry scrapers (limit to top weighted sources for speed/quality)
+        registry_sources = self._get_registry_sources(max_sources=30)
         # Pair each source with its scraper to preserve weight for sorting
         registry_pairs = [
             (src, self._make_registry_scraper(src))
             for src in registry_sources
         ]
-        
+
         # Combine all scrapers: core + registry
         all_scrapers = core_scrapers + [(src["name"], fn) for src, fn in registry_pairs]
-        
+
         # Deduplicate by source name (registry may duplicate core sources)
         seen_names = set()
         unique_scrapers = []
@@ -269,40 +270,38 @@ class UPCScraper:
                 results.append(fallback)
 
         return results
-    
-    def _get_registry_sources(self) -> List[Dict[str, Any]]:
+
+    def _get_registry_sources(self, max_sources: int = None) -> List[Dict[str, Any]]:
         """Load scraper sources from registry file."""
         try:
             from backend.scraper_registry import ScraperRegistry
             registry = ScraperRegistry()
-            return registry.get_enabled_sources()
+            return registry.get_enabled_sources(max_sources=max_sources)
         except Exception as e:
             logger.warning(f"Could not load scraper registry: {e}")
             return []
-    
+
     def _make_registry_scraper(self, source_def: Dict[str, Any]):
         """Create a dynamic scraper function from a registry definition."""
         async def _scraper(upc: str) -> Dict[str, Any]:
             return await self._registry_scrape(source_def, upc)
         return _scraper
-    
+
     async def _registry_scrape(self, source_def: Dict[str, Any], upc: str) -> Dict[str, Any]:
         """Dynamic scraper for registry-defined sources."""
-        import json
-        from bs4 import BeautifulSoup
-        
+
         source_name = source_def.get("name", "Unknown")
         source_type = source_def.get("type", "html")
         url_template = source_def.get("url_template", "")
         method = source_def.get("method", "GET")
         timeout = source_def.get("timeout", 10)
-        
+
         if not url_template:
             return self._fail(source_name, "", {}, "No URL template")
-        
+
         # Build URL
         url = url_template.replace("{upc}", upc)
-        
+
         # Handle auth placeholders
         requires_auth = source_def.get("requires_auth")
         if requires_auth and "{" in url:
@@ -310,7 +309,7 @@ class UPCScraper:
             if not api_key:
                 return self._fail(source_name, url, {}, f"Auth key {requires_auth} not configured")
             url = url.replace(f"{{{requires_auth}}}", api_key)
-        
+
         # Make request
         headers = self._next_headers()
         try:
@@ -318,22 +317,22 @@ class UPCScraper:
                 response = await self._get_with_retry(url, headers=headers, timeout=timeout)
             else:
                 response = await self._get_with_retry(url, headers=headers, timeout=timeout)
-            
+
             data = response.json() if source_type == "api" else None
         except Exception as e:
             return self._fail(source_name, url, {}, str(e))
-        
+
         # Extract data based on type
         if source_type == "api":
             return self._extract_api_data(source_def, data, upc, url)
         else:
             return self._extract_html_data(source_def, response.text, upc, url)
-    
+
     def _extract_api_data(self, source_def: Dict[str, Any], data: Dict, upc: str, url: str) -> Dict[str, Any]:
         """Extract structured data from JSON API response."""
         source_name = source_def.get("name", "Unknown")
         extract = source_def.get("extract", {})
-        
+
         def get_nested(data, path):
             """Safely navigate nested dict/list structure."""
             current = data
@@ -347,13 +346,13 @@ class UPCScraper:
                 else:
                     return None
             return current
-        
+
         name = get_nested(data, extract.get("name", []))
         brand = get_nested(data, extract.get("brand", []))
         category = get_nested(data, extract.get("category", []))
         description = get_nested(data, extract.get("description", []))
         image_urls_raw = get_nested(data, extract.get("image_urls", []))
-        
+
         # Handle image URLs (could be string, list, or dict)
         image_urls = []
         if isinstance(image_urls_raw, str):
@@ -365,7 +364,7 @@ class UPCScraper:
             for v in image_urls_raw.values():
                 if isinstance(v, str) and _is_valid_image_url(v):
                     image_urls.append(v)
-        
+
         # Extract attributes
         attributes = {}
         attrs_def = extract.get("attributes", [])
@@ -373,7 +372,7 @@ class UPCScraper:
             attrs_data = get_nested(data, attrs_def)
             if isinstance(attrs_data, dict):
                 attributes = attrs_data
-        
+
         # Check success condition
         success_condition = source_def.get("success_condition")
         if success_condition:
@@ -382,10 +381,10 @@ class UPCScraper:
             actual_value = get_nested(data, [condition_field])
             if actual_value != condition_value:
                 return self._fail(source_name, url, data, f"Success condition not met: {condition_field}={actual_value}")
-        
+
         if not name:
             return self._fail(source_name, url, data, "Product not found")
-        
+
         return {
             "upc": upc, "source": source_name, "source_url": url,
             "name": name, "brand": brand, "category": category,
@@ -393,14 +392,14 @@ class UPCScraper:
             "attributes": attributes, "raw": data,
             "success": True, "error": None,
         }
-    
+
     def _extract_html_data(self, source_def: Dict[str, Any], html: str, upc: str, url: str) -> Dict[str, Any]:
         """Extract data from HTML response using CSS selectors."""
         source_name = source_def.get("name", "Unknown")
         selectors = source_def.get("selectors", {})
-        
+
         soup = BeautifulSoup(html, "html.parser")
-        
+
         def extract_field(selector_list):
             """Try multiple selectors until one finds content."""
             if not selector_list:
@@ -433,16 +432,16 @@ class UPCScraper:
                 except Exception:
                     continue
             return None
-        
+
         name = extract_field(selectors.get("name", []))
         brand = extract_field(selectors.get("brand", []))
         description = extract_field(selectors.get("description", []))
         image_url = extract_field(selectors.get("image_urls", []))
-        
+
         image_urls = []
         if image_url and _is_valid_image_url(image_url):
             image_urls = [image_url]
-        
+
         # Extract attributes from table rows
         attributes = {}
         attr_selectors = selectors.get("attributes", [])
@@ -459,10 +458,10 @@ class UPCScraper:
                                 attributes[key] = val
             except Exception:
                 pass
-        
+
         if not name:
             return self._fail(source_name, url, {}, "Product not found")
-        
+
         return {
             "upc": upc, "source": source_name, "source_url": url,
             "name": name, "brand": brand, "category": None,

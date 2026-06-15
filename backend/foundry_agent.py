@@ -7,14 +7,14 @@ Microsoft Azure AI Foundry SDK integration with tiered fallback:
   4. Local deterministic simulation — final fallback
 """
 
-import os
 import asyncio
-import re
+import hashlib
 import json
 import logging
-import hashlib
-from typing import List, Dict, Optional, Tuple, Any
+import os
+import re
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 # Ensure .env is loaded before reading env vars
 try:
@@ -27,7 +27,6 @@ except Exception:
 
 # Optional Foundry IQ knowledge graph fallback
 try:
-    from backend.foundry_iq import FoundryIQService, ProductKnowledgeGraph
     _FOUNDRY_IQ_AVAILABLE = True
 except Exception:
     _FOUNDRY_IQ_AVAILABLE = False
@@ -56,6 +55,8 @@ try:
     _OPENAI_AVAILABLE = True
 except Exception:
     _OPENAI_AVAILABLE = False
+
+from backend.image_verifier import select_verified_images
 
 SOURCE_WEIGHTS = {
     "Open Food Facts": 0.90,
@@ -187,7 +188,7 @@ class ProductReasoningAgent:
         trace.append(f"Generated description ({len(description)} chars)")
 
         # Step 5: Select images
-        images, best_image_url = self._select_images(weighted)
+        images, best_image_url = await self._select_images(upc, weighted, name, brand)
         trace.append(f"Selected {len(images)} images, best: {best_image_url is not None}")
 
         # Step 6: Compute confidence
@@ -614,17 +615,44 @@ Rules:
 
         return f"Product information for UPC {fields.get('upc', 'unknown')}"
 
-    def _select_images(self, weighted_sources: List[Tuple[Dict, float]]) -> Tuple[List[Dict], Optional[str]]:
+    async def _select_images(
+        self,
+        upc: str,
+        weighted_sources: List[Tuple[Dict, float]],
+        name: str,
+        brand: Optional[str],
+    ) -> Tuple[List[Dict], Optional[str]]:
         seen_urls = set()
-        images = []
+        candidates = []
         for data, weight in weighted_sources:
             for url in data.get("image_urls", []):
                 if url and url not in seen_urls:
                     seen_urls.add(url)
-                    images.append({"url": url, "source": data.get("source", "Unknown"), "score": round(weight, 3)})
-        images.sort(key=lambda x: x["score"], reverse=True)
-        best_url = images[0]["url"] if images else None
-        return images, best_url
+                    candidates.append({"url": url, "source": data.get("source", "Unknown"), "score": round(weight, 3)})
+
+        if not candidates:
+            return [], None
+
+        # Run deterministic verification pipeline (white bg, quality, focus, dedup)
+        try:
+            verified_images, best_url = await select_verified_images(
+                candidates=candidates,
+                product_name=name,
+                product_brand=brand,
+                max_images=5,
+            )
+        except Exception as e:
+            logger = logging.getLogger("shelfwise")
+            logger.warning(f"UPC {upc}: image verification failed ({e}); falling back to source-weighted ranking")
+            candidates.sort(key=lambda x: x["score"], reverse=True)
+            return candidates[:5], candidates[0]["url"] if candidates else None
+
+        if not verified_images:
+            # No image passed verification; fall back to highest source-weighted candidate
+            candidates.sort(key=lambda x: x["score"], reverse=True)
+            return candidates[:5], candidates[0]["url"] if candidates else None
+
+        return verified_images, best_url
 
     def _merge_attributes(self, weighted_sources: List[Tuple[Dict, float]]) -> Dict[str, Any]:
         merged = {}

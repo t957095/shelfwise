@@ -13,6 +13,7 @@ if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
 from dotenv import load_dotenv
+
 load_dotenv(_project_root / ".env")
 
 import csv
@@ -21,23 +22,31 @@ import json
 import logging
 import time
 from contextlib import asynccontextmanager
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 
-from fastapi import FastAPI, BackgroundTasks, UploadFile, File, HTTPException, Query
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse, StreamingResponse
 import httpx
+from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Query, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
 
-from backend.models import ConsolidatedProduct, UPCBatchRequest, ExportRequest, JobStatus
-from backend.database import (
-    init_db, create_job, update_job, get_job, upsert_product, get_product,
-    get_all_products, delete_all_products, get_stats, search_products, bulk_upsert_products,
-)
-from backend.scraper import UPCScraper, SOURCE_WEIGHTS
-from backend.foundry_agent import ProductReasoningAgent
 from backend.cache import upc_cache
+from backend.database import (
+    create_job,
+    delete_all_products,
+    get_all_products,
+    get_job,
+    get_product,
+    get_stats,
+    init_db,
+    search_products,
+    update_job,
+    upsert_product,
+)
+from backend.foundry_agent import ProductReasoningAgent
 from backend.foundry_iq import FoundryIQService, get_foundry_iq_service
+from backend.models import ConsolidatedProduct, ExportRequest, UPCBatchRequest
+from backend.scraper import SOURCE_WEIGHTS, UPCScraper
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("shelfwise")

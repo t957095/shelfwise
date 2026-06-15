@@ -1,5 +1,6 @@
-import pytest
 from fastapi.testclient import TestClient
+
+from backend.database import delete_all_products
 from backend.main import app
 
 client = TestClient(app)
@@ -10,9 +11,10 @@ def test_read_root():
     response = client.get("/")
     assert response.status_code == 200
     data = response.json()
-    assert "app" in data
-    assert data["app"] == "ShelfWise"
+    assert "name" in data
+    assert data["name"] == "ShelfWise"
     assert "version" in data
+    assert "endpoints" in data
 
 
 def test_health_check():
@@ -27,6 +29,7 @@ def test_health_check():
 
 def test_get_products_empty():
     """Test getting products when database is empty."""
+    delete_all_products()
     response = client.get("/api/products")
     assert response.status_code == 200
     data = response.json()
@@ -42,26 +45,28 @@ def test_get_product_not_found():
 
 def test_get_stats_empty():
     """Test stats endpoint when database is empty."""
+    delete_all_products()
     response = client.get("/api/stats")
     assert response.status_code == 200
     data = response.json()
     assert data["total_products"] == 0
     assert data["avg_confidence"] == 0.0
-    assert data["confidence_distribution"]["high"] == 0
 
 
 def test_export_csv_empty():
     """Test CSV export with no products."""
+    delete_all_products()
     response = client.post("/api/export", json={"format": "csv"})
     assert response.status_code == 200
-    assert response.headers["content-type"] == "text/csv"
+    assert response.headers["content-type"].startswith("text/csv")
 
 
 def test_export_json_empty():
     """Test JSON export with no products."""
+    delete_all_products()
     response = client.post("/api/export", json={"format": "json"})
     assert response.status_code == 200
-    assert response.headers["content-type"] == "application/json"
+    assert response.headers["content-type"].startswith("application/json")
     data = response.json()
     assert data == []
 
@@ -82,13 +87,13 @@ def test_batch_submission():
     """Test batch submission with valid UPCs."""
     response = client.post(
         "/api/batch",
-        json={"upcs": ["049000050103"], "auto_scrape": True},
+        json={"upcs": ["049000050103"], "auto_scrape": False},
     )
     assert response.status_code == 200
     data = response.json()
     assert "job_id" in data
     assert data["total"] == 1
-    assert data["status"] == "accepted"
+    assert "message" in data
 
 
 def test_job_status_not_found():

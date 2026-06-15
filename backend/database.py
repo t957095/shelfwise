@@ -8,15 +8,13 @@ Features:
 - Query timing and metrics hooks
 """
 
-import sqlite3
 import json
 import os
-import uuid
+import sqlite3
 import threading
-import time
+import uuid
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
-from contextlib import contextmanager
+from typing import Any, Dict, List, Optional
 
 from backend.models import ConsolidatedProduct
 
@@ -39,13 +37,41 @@ def _get_connection() -> sqlite3.Connection:
     return _db_local.conn
 
 
+def _table_has_columns(conn: sqlite3.Connection, table: str, required: List[str]) -> bool:
+    """Check whether table exists with all required columns."""
+    try:
+        rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+    except Exception:
+        return False
+    existing = {r[1] for r in rows}
+    return all(col in existing for col in required)
+
+
+def _reset_schema(conn: sqlite3.Connection):
+    """Drop existing tables so the canonical schema can be created."""
+    conn.execute("DROP TABLE IF EXISTS products")
+    conn.execute("DROP TABLE IF EXISTS jobs")
+    conn.execute("DROP INDEX IF EXISTS idx_products_name")
+    conn.execute("DROP INDEX IF EXISTS idx_products_brand")
+    conn.execute("DROP INDEX IF EXISTS idx_products_category")
+    conn.execute("DROP INDEX IF EXISTS idx_products_confidence")
+    conn.execute("DROP INDEX IF EXISTS idx_products_status")
+    conn.execute("DROP INDEX IF EXISTS idx_jobs_status")
+
+
 def init_db():
-    """Create tables and indexes if they don't exist."""
+    """Create tables and indexes. Resets incompatible legacy schemas."""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     try:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA synchronous=NORMAL")
+
+        products_required = {"upc", "name", "brand", "category", "confidence", "status", "data"}
+        jobs_required = {"job_id", "total", "queued", "running", "completed", "failed"}
+
+        if not _table_has_columns(conn, "products", products_required) or not _table_has_columns(conn, "jobs", jobs_required):
+            _reset_schema(conn)
 
         # Products table with optimized schema
         conn.execute(
@@ -67,14 +93,17 @@ def init_db():
         )
 
         # Migrate existing tables if they don't have the new columns
-        try:
-            conn.execute("ALTER TABLE products ADD COLUMN foundry_enriched INTEGER DEFAULT 0")
-        except Exception:
-            pass
-        try:
-            conn.execute("ALTER TABLE products ADD COLUMN foundry_sdk TEXT")
-        except Exception:
-            pass
+        migrations = [
+            "ALTER TABLE products ADD COLUMN confidence REAL",
+            "ALTER TABLE products ADD COLUMN status TEXT",
+            "ALTER TABLE products ADD COLUMN foundry_enriched INTEGER DEFAULT 0",
+            "ALTER TABLE products ADD COLUMN foundry_sdk TEXT",
+        ]
+        for sql in migrations:
+            try:
+                conn.execute(sql)
+            except Exception:
+                pass
 
         # Jobs table
         conn.execute(
