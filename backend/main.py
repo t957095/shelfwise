@@ -52,6 +52,7 @@ from backend.database import (
 from backend.foundry_agent import ProductReasoningAgent
 from backend.foundry_iq import FoundryIQService, get_foundry_iq_service
 from backend.image_acquisition import acquire_required_product_images
+from backend.image_search import direct_listing_urls_for_upc
 from backend.models import ConsolidatedProduct, ExportRequest, UPCBatchRequest
 from backend.scraper import SOURCE_WEIGHTS, UPCScraper
 
@@ -152,6 +153,52 @@ def _image_provider_config() -> Dict[str, bool]:
         "amazon_rapidapi": bool(os.environ.get("RAPIDAPI_AMAZON_SCRAPER_KEY") or os.environ.get("RAPIDAPI_KEY")),
         "html_fallbacks": True,
         "direct_retailer_probes": True,
+    }
+
+
+def _registry_source_capabilities() -> Dict[str, Any]:
+    registry_sources = []
+    try:
+        registry_path = _project_root / "backend" / "scraper_registry.json"
+        registry_sources = json.loads(registry_path.read_text(encoding="utf-8")).get("sources", [])
+    except Exception:
+        registry_sources = []
+
+    def has_capability(source: Dict[str, Any], field: str) -> bool:
+        return field in source.get("extract", {}) or field in source.get("selectors", {})
+
+    return {
+        "registry_total": len(registry_sources),
+        "core_scrapers": len(SOURCE_WEIGHTS),
+        "title_sources": len(SOURCE_WEIGHTS) + sum(1 for s in registry_sources if has_capability(s, "name")),
+        "description_sources": sum(1 for s in registry_sources if has_capability(s, "description")),
+        "image_sources": sum(1 for s in registry_sources if has_capability(s, "image_urls")),
+        "brand_sources": sum(1 for s in registry_sources if has_capability(s, "brand")),
+        "category_sources": sum(1 for s in registry_sources if has_capability(s, "category")),
+    }
+
+
+def _acquisition_source_capabilities() -> Dict[str, Any]:
+    providers = _image_provider_config()
+    return {
+        "direct_retailer_probe_sources": len(direct_listing_urls_for_upc("000000000000")),
+        "structured_marketplace_providers": [
+            "Amazon Scraper API",
+            "Amazon RapidAPI",
+            "SerpAPI Google Shopping",
+            "SearchAPI Google Shopping",
+            "eBay Browse",
+        ],
+        "listing_search_providers": ["Brave Listings", "SerpAPI Listings", "DuckDuckGo Listings", "Bing Listings"],
+        "image_search_providers": [
+            "Brave Image Search",
+            "SerpAPI Images",
+            "SearchAPI Images",
+            "Google Image Search",
+            "DuckDuckGo Images",
+            "Bing Images",
+        ],
+        "configured_providers": providers,
     }
 
 
@@ -1402,9 +1449,33 @@ async def health_check():
         "cache": upc_cache.stats(),
         "image_acquisition": {
             "providers": _image_provider_config(),
-            "direct_probe_sources": 14,
+            "direct_probe_sources": len(direct_listing_urls_for_upc("000000000000")),
         },
         "foundry_iq": fiq_health,
+    }
+
+
+@app.get("/api/sources")
+async def get_source_capabilities():
+    """Return source redundancy by product field and acquisition channel."""
+    registry = _registry_source_capabilities()
+    acquisition = _acquisition_source_capabilities()
+    return {
+        "summary": {
+            "title_information_sources": registry["title_sources"]
+            + len(acquisition["structured_marketplace_providers"])
+            + len(acquisition["listing_search_providers"]),
+            "description_information_sources": registry["description_sources"]
+            + len(acquisition["structured_marketplace_providers"])
+            + len(acquisition["listing_search_providers"]),
+            "image_information_sources": registry["image_sources"]
+            + acquisition["direct_retailer_probe_sources"]
+            + len(acquisition["structured_marketplace_providers"])
+            + len(acquisition["listing_search_providers"])
+            + len(acquisition["image_search_providers"]),
+        },
+        "registry": registry,
+        "image_acquisition": acquisition,
     }
 
 

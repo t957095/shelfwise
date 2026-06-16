@@ -132,6 +132,8 @@ RAPIDAPI_AMAZON_SCRAPER_KEY=your-rapidapi-amazon-product-scraper-key
 AMAZON_COUNTRY_CODE=US
 ```
 
+`SERPAPI_KEY` and `SEARCHAPI_KEY` are used for both web/image search and Google Shopping-style product evidence. A Google Maps-only key is not enough unless the same Google Cloud project also has Custom Search enabled and a `GOOGLE_CX` Programmable Search Engine ID.
+
 **Never commit `.env` to Git.** It is already in `.gitignore`.
 
 ## API Reference

@@ -275,7 +275,12 @@ async def acquire_required_product_images(
 
     search_candidates: List[Dict[str, Any]] = []
     listing_evidence: List[Dict[str, Any]] = []
-    direct_evidence = await _scrape_direct_upc_evidence(upc, client, max_pages=8, timeout=per_query_timeout)
+    direct_evidence = await _scrape_direct_upc_evidence(
+        upc,
+        client,
+        max_pages=len(direct_listing_urls_for_upc(upc)),
+        timeout=per_query_timeout,
+    )
     if direct_evidence:
         trace.append(f"Image acquisition: direct UPC probes produced {len(direct_evidence)} listing evidence pages")
         listing_evidence.extend(direct_evidence)

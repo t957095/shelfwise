@@ -539,6 +539,87 @@ async def _rapidapi_amazon_search(client: httpx.AsyncClient, query: str, max_res
         return []
 
 
+def _shopping_result_to_listing(item: Dict[str, Any], source: str) -> Dict[str, Any]:
+    image_urls = []
+    for key in ("thumbnail", "image", "image_url", "product_image"):
+        cleaned = _clean_image_url(str(item.get(key) or ""))
+        if cleaned and cleaned not in image_urls:
+            image_urls.append(cleaned)
+
+    price = item.get("price") or item.get("extracted_price")
+    link = item.get("product_link") or item.get("link") or item.get("source_link")
+    return {
+        "source": source,
+        "source_url": link,
+        "name": item.get("title") or item.get("name"),
+        "brand": item.get("brand"),
+        "category": item.get("category"),
+        "description": item.get("description") or item.get("snippet"),
+        "image_urls": image_urls,
+        "attributes": {
+            key: value
+            for key, value in {
+                "listing_price": price,
+                "merchant": item.get("source") or item.get("merchant"),
+                "rating": item.get("rating"),
+                "reviews": item.get("reviews"),
+            }.items()
+            if value not in (None, "", [])
+        },
+        "success": True,
+    }
+
+
+async def _serpapi_shopping_search(client: httpx.AsyncClient, query: str, max_results: int = 10) -> List[Dict[str, Any]]:
+    """Search Google Shopping through SerpAPI when configured."""
+    api_key = os.environ.get("SERPAPI_KEY", "")
+    if not api_key:
+        return []
+    try:
+        response = await client.get(
+            "https://serpapi.com/search.json",
+            params={"engine": "google_shopping", "q": query, "api_key": api_key},
+            timeout=15.0,
+        )
+        response.raise_for_status()
+        data = response.json()
+        listings = [
+            _shopping_result_to_listing(item, "SerpAPI Google Shopping")
+            for item in data.get("shopping_results", [])[:max_results]
+        ]
+        listings = [listing for listing in listings if listing.get("name") or listing.get("image_urls")]
+        logger.info("SerpAPI Shopping returned %s listings for %r", len(listings), query)
+        return listings
+    except Exception as e:
+        logger.warning(f"SerpAPI Shopping search failed: {e}")
+        return []
+
+
+async def _searchapi_shopping_search(client: httpx.AsyncClient, query: str, max_results: int = 10) -> List[Dict[str, Any]]:
+    """Search Google Shopping through SearchAPI.io when configured."""
+    api_key = os.environ.get("SEARCHAPI_KEY", "")
+    if not api_key:
+        return []
+    try:
+        response = await client.get(
+            "https://www.searchapi.io/api/v1/search",
+            params={"engine": "google_shopping", "q": query, "api_key": api_key},
+            timeout=15.0,
+        )
+        response.raise_for_status()
+        data = response.json()
+        listings = [
+            _shopping_result_to_listing(item, "SearchAPI Google Shopping")
+            for item in data.get("shopping_results", [])[:max_results]
+        ]
+        listings = [listing for listing in listings if listing.get("name") or listing.get("image_urls")]
+        logger.info("SearchAPI Shopping returned %s listings for %r", len(listings), query)
+        return listings
+    except Exception as e:
+        logger.warning(f"SearchAPI Shopping search failed: {e}")
+        return []
+
+
 async def search_product_listing_pages(
     query: str,
     max_results: int = 8,
@@ -579,7 +660,13 @@ async def search_structured_marketplace_listings(
     client = client or httpx.AsyncClient(timeout=20.0, follow_redirects=True)
     try:
         listings: List[Dict[str, Any]] = []
-        for fn in [_omkar_amazon_search, _rapidapi_amazon_search, _ebay_listing_search]:
+        for fn in [
+            _omkar_amazon_search,
+            _rapidapi_amazon_search,
+            _serpapi_shopping_search,
+            _searchapi_shopping_search,
+            _ebay_listing_search,
+        ]:
             found = await fn(client, query, max_results)
             listings.extend(found)
             if len(listings) >= max_results:

@@ -5,6 +5,7 @@ import pytest
 from backend.image_search import (
     _amazon_result_to_listing,
     _clean_image_url,
+    _shopping_result_to_listing,
     scrape_product_listing_page,
     search_images_for_product,
     search_product_images,
@@ -42,6 +43,25 @@ def test_amazon_result_to_listing_maps_images_and_fields():
     assert listing["source_url"] == "https://www.amazon.com/dp/B000TEST"
     assert listing["image_urls"] == ["https://m.media-amazon.com/images/I/test.jpg"]
     assert listing["attributes"]["asin"] == "B000TEST"
+
+
+def test_shopping_result_to_listing_maps_merchant_and_thumbnail():
+    listing = _shopping_result_to_listing(
+        {
+            "title": "Shopping Product",
+            "thumbnail": "https://encrypted-tbn0.gstatic.com/images?q=test",
+            "price": "$4.99",
+            "source": "Retailer",
+            "product_link": "https://example.com/product",
+        },
+        "SerpAPI Google Shopping",
+    )
+
+    assert listing["source"] == "SerpAPI Google Shopping"
+    assert listing["name"] == "Shopping Product"
+    assert listing["source_url"] == "https://example.com/product"
+    assert listing["image_urls"] == ["https://encrypted-tbn0.gstatic.com/images?q=test"]
+    assert listing["attributes"]["merchant"] == "Retailer"
 
 
 @pytest.mark.asyncio
