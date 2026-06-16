@@ -6,6 +6,8 @@ from backend.image_search import (
     _amazon_result_to_listing,
     _clean_image_url,
     _shopping_result_to_listing,
+    category_listing_urls_for_upc,
+    category_search_domains,
     scrape_product_listing_page,
     search_images_for_product,
     search_product_images,
@@ -22,6 +24,13 @@ def test_clean_image_url_rejects_invalid():
 def test_clean_image_url_accepts_direct_image():
     url = "https://example.com/product.jpg"
     assert _clean_image_url(url) == url
+
+
+def test_category_listing_urls_route_pet_care_to_specialists():
+    urls = category_listing_urls_for_upc("017800111719", "Pet Care")
+    assert any("chewy.com" in url for url in urls)
+    assert any("petco.com" in url for url in urls)
+    assert "chewy.com" in category_search_domains("pet supplies")
 
 
 def test_amazon_result_to_listing_maps_images_and_fields():

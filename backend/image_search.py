@@ -151,6 +151,122 @@ def direct_listing_urls_for_upc(upc: str) -> List[str]:
     ]
 
 
+CATEGORY_RETAILER_SEARCH_URLS = {
+    "pet care": [
+        "https://www.chewy.com/s?query={query}",
+        "https://www.petco.com/shop/en/petcostore/search?query={query}",
+        "https://www.petsmart.com/search/?q={query}",
+        "https://www.tractorsupply.com/tsc/search/{query}",
+        "https://www.walmart.com/search?q={query}%20pet",
+        "https://www.target.com/s?searchTerm={query}%20pet",
+    ],
+    "household": [
+        "https://www.homedepot.com/s/{query}",
+        "https://www.lowes.com/search?searchTerm={query}",
+        "https://www.grainger.com/search?searchQuery={query}",
+        "https://www.uline.com/BL_86/Search?keywords={query}",
+        "https://www.staples.com/{query}/directory_{query}",
+        "https://www.walmart.com/search?q={query}%20cleaning",
+    ],
+    "cleaning": [
+        "https://www.homedepot.com/s/{query}",
+        "https://www.lowes.com/search?searchTerm={query}",
+        "https://www.grainger.com/search?searchQuery={query}",
+        "https://www.uline.com/BL_86/Search?keywords={query}",
+        "https://www.samsclub.com/sams/search/searchResults.jsp?searchTerm={query}%20cleaning",
+    ],
+    "baby care": [
+        "https://www.target.com/s?searchTerm={query}%20baby",
+        "https://www.walmart.com/search?q={query}%20baby",
+        "https://www.walgreens.com/search/results.jsp?Ntt={query}",
+        "https://www.cvs.com/search?searchTerm={query}",
+    ],
+    "personal care": [
+        "https://www.walgreens.com/search/results.jsp?Ntt={query}",
+        "https://www.cvs.com/search?searchTerm={query}",
+        "https://www.target.com/s?searchTerm={query}%20personal%20care",
+        "https://www.walmart.com/search?q={query}%20personal%20care",
+    ],
+    "beverages": [
+        "https://www.kroger.com/search?query={query}",
+        "https://www.walmart.com/search?q={query}%20beverage",
+        "https://www.target.com/s?searchTerm={query}%20beverage",
+        "https://www.samsclub.com/sams/search/searchResults.jsp?searchTerm={query}%20beverage",
+    ],
+    "snacks": [
+        "https://www.kroger.com/search?query={query}",
+        "https://www.walmart.com/search?q={query}%20snack",
+        "https://www.target.com/s?searchTerm={query}%20snack",
+        "https://www.samsclub.com/sams/search/searchResults.jsp?searchTerm={query}%20snack",
+    ],
+    "frozen": [
+        "https://www.kroger.com/search?query={query}%20frozen",
+        "https://www.walmart.com/search?q={query}%20frozen",
+        "https://www.target.com/s?searchTerm={query}%20frozen",
+    ],
+    "office": [
+        "https://www.staples.com/{query}/directory_{query}",
+        "https://www.officedepot.com/catalog/search.do?Ntt={query}",
+        "https://www.walmart.com/search?q={query}%20office",
+    ],
+}
+
+
+CATEGORY_SEARCH_DOMAINS = {
+    "pet care": ["chewy.com", "petco.com", "petsmart.com", "tractorsupply.com", "walmart.com", "target.com"],
+    "household": ["homedepot.com", "lowes.com", "grainger.com", "uline.com", "staples.com", "walmart.com"],
+    "cleaning": ["homedepot.com", "lowes.com", "grainger.com", "uline.com", "samsclub.com"],
+    "baby care": ["target.com", "walmart.com", "walgreens.com", "cvs.com"],
+    "personal care": ["walgreens.com", "cvs.com", "target.com", "walmart.com"],
+    "beverages": ["kroger.com", "walmart.com", "target.com", "samsclub.com"],
+    "snacks": ["kroger.com", "walmart.com", "target.com", "samsclub.com"],
+    "frozen": ["kroger.com", "walmart.com", "target.com"],
+    "office": ["staples.com", "officedepot.com", "walmart.com"],
+}
+
+
+def _category_key(category: Optional[str]) -> str:
+    if not category:
+        return ""
+    normalized = category.strip().lower()
+    if "pet" in normalized:
+        return "pet care"
+    if "clean" in normalized:
+        return "cleaning"
+    if "household" in normalized:
+        return "household"
+    if "baby" in normalized:
+        return "baby care"
+    if "personal" in normalized or "health" in normalized or "beauty" in normalized:
+        return "personal care"
+    if "beverage" in normalized or "drink" in normalized or "cola" in normalized:
+        return "beverages"
+    if "snack" in normalized or "cracker" in normalized or "cookie" in normalized:
+        return "snacks"
+    if "frozen" in normalized:
+        return "frozen"
+    if "office" in normalized:
+        return "office"
+    return normalized
+
+
+def category_listing_urls_for_upc(upc: str, category: Optional[str]) -> List[str]:
+    """Category-specific retailer searches for a UPC/POS department."""
+    key = _category_key(category)
+    templates = CATEGORY_RETAILER_SEARCH_URLS.get(key, [])
+    encoded = urllib.parse.quote_plus(upc)
+    urls = []
+    for template in templates:
+        url = template.format(query=encoded)
+        if url not in urls:
+            urls.append(url)
+    return urls
+
+
+def category_search_domains(category: Optional[str]) -> List[str]:
+    return CATEGORY_SEARCH_DOMAINS.get(_category_key(category), [])
+
+
 async def _brave_image_search(client: httpx.AsyncClient, query: str, max_results: int = 10) -> List[str]:
     """Search Brave Images API."""
     api_key = os.environ.get("BRAVE_API_KEY", "")

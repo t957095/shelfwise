@@ -15,6 +15,8 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 import httpx
 
 from backend.image_search import (
+    category_listing_urls_for_upc,
+    category_search_domains,
     direct_listing_urls_for_upc,
     scrape_product_listing_page,
     search_product_images,
@@ -121,6 +123,9 @@ def _build_image_queries(product: Dict[str, Any], seed_data: Optional[Dict[str, 
     if category and upc:
         queries.append(f'"{upc}" {category} product package')
         queries.append(f"{category} {upc} retailer listing")
+        domains = category_search_domains(category)
+        for domain in domains[:6]:
+            queries.append(f'"{upc}" site:{domain}')
 
     deduped = []
     seen = set()
@@ -195,12 +200,18 @@ async def _scrape_listing_evidence(
 
 async def _scrape_direct_upc_evidence(
     upc: str,
+    category: Optional[str],
     client: Optional[httpx.AsyncClient],
     max_pages: int,
     timeout: float,
 ) -> List[Dict[str, Any]]:
     evidence: List[Dict[str, Any]] = []
-    for url in direct_listing_urls_for_upc(upc)[:max_pages]:
+    urls = direct_listing_urls_for_upc(upc) + category_listing_urls_for_upc(upc, category)
+    seen = set()
+    for url in urls[:max_pages]:
+        if url in seen:
+            continue
+        seen.add(url)
         try:
             listing = await asyncio.wait_for(scrape_product_listing_page(url, client=client), timeout=timeout)
         except Exception as exc:
@@ -277,8 +288,10 @@ async def acquire_required_product_images(
     listing_evidence: List[Dict[str, Any]] = []
     direct_evidence = await _scrape_direct_upc_evidence(
         upc,
+        product.get("category") or (seed_data or {}).get("category"),
         client,
-        max_pages=len(direct_listing_urls_for_upc(upc)),
+        max_pages=len(direct_listing_urls_for_upc(upc))
+        + len(category_listing_urls_for_upc(upc, product.get("category") or (seed_data or {}).get("category"))),
         timeout=per_query_timeout,
     )
     if direct_evidence:

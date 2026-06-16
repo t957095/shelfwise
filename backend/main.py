@@ -52,7 +52,7 @@ from backend.database import (
 from backend.foundry_agent import ProductReasoningAgent
 from backend.foundry_iq import FoundryIQService, get_foundry_iq_service
 from backend.image_acquisition import acquire_required_product_images
-from backend.image_search import direct_listing_urls_for_upc
+from backend.image_search import CATEGORY_RETAILER_SEARCH_URLS, direct_listing_urls_for_upc
 from backend.models import ConsolidatedProduct, ExportRequest, UPCBatchRequest
 from backend.scraper import SOURCE_WEIGHTS, UPCScraper
 
@@ -74,6 +74,10 @@ _scrape_times: List[float] = []
 async def lifespan(app: FastAPI):
     global http_client, scraper, foundry_iq, agent
     init_db()
+    if os.environ.get("SHELFWISE_CLEAR_ON_STARTUP", "true").strip().lower() not in {"0", "false", "no"}:
+        delete_all_products()
+        upc_cache.clear()
+        logger.info("ShelfWise startup clean slate: cleared products, jobs, and UPC cache")
     http_client = httpx.AsyncClient(
         timeout=30.0, limits=httpx.Limits(max_connections=300, max_keepalive_connections=100)
     )
@@ -180,8 +184,13 @@ def _registry_source_capabilities() -> Dict[str, Any]:
 
 def _acquisition_source_capabilities() -> Dict[str, Any]:
     providers = _image_provider_config()
+    category_probe_total = sum(len(templates) for templates in CATEGORY_RETAILER_SEARCH_URLS.values())
     return {
         "direct_retailer_probe_sources": len(direct_listing_urls_for_upc("000000000000")),
+        "category_specific_probe_total": category_probe_total,
+        "category_specific_probe_sources": {
+            category: len(templates) for category, templates in CATEGORY_RETAILER_SEARCH_URLS.items()
+        },
         "structured_marketplace_providers": [
             "Amazon Scraper API",
             "Amazon RapidAPI",
@@ -1470,6 +1479,7 @@ async def get_source_capabilities():
             + len(acquisition["listing_search_providers"]),
             "image_information_sources": registry["image_sources"]
             + acquisition["direct_retailer_probe_sources"]
+            + acquisition["category_specific_probe_total"]
             + len(acquisition["structured_marketplace_providers"])
             + len(acquisition["listing_search_providers"])
             + len(acquisition["image_search_providers"]),

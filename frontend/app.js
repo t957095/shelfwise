@@ -453,7 +453,7 @@ function renderProducts() {
             <div class="empty-state" style="grid-column: 1 / -1;">
                 <div class="icon">Catalog</div>
                 <h3>No products yet</h3>
-                <p>Enter UPC codes above or load the demo to get started</p>
+                <p>Enter UPC codes above or upload a POS CSV to get started</p>
             </div>
         `;
         return;

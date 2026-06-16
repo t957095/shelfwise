@@ -345,7 +345,12 @@ class UPCScraper:
         successful = sum(1 for r in results if r.get("success"))
         logger.info(f"UPC {upc}: scraped {successful}/{total_sources} sources in {elapsed:.2f}s")
 
-        if not results:
+        demo_fallback_enabled = os.environ.get("SHELFWISE_ENABLE_DEMO_FALLBACK", "false").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+        }
+        if not results and demo_fallback_enabled:
             fallback = self._get_demo_fallback(upc)
             if fallback:
                 results.append(fallback)
