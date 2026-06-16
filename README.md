@@ -127,6 +127,9 @@ GOOGLE_CX=your-programmable-search-engine-id
 SERPAPI_KEY=your-serpapi-key
 SEARCHAPI_KEY=your-searchapi-io-key
 EBAY_BEARER_TOKEN=your-ebay-browse-api-token
+AMAZON_SCRAPER_API_KEY=your-omkar-amazon-scraper-api-key
+RAPIDAPI_AMAZON_SCRAPER_KEY=your-rapidapi-amazon-product-scraper-key
+AMAZON_COUNTRY_CODE=US
 ```
 
 **Never commit `.env` to Git.** It is already in `.gitignore`.

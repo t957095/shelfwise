@@ -434,6 +434,111 @@ async def _ebay_listing_search(client: httpx.AsyncClient, query: str, max_result
         return []
 
 
+def _amazon_result_to_listing(item: Dict[str, Any], source: str) -> Dict[str, Any]:
+    image_urls = []
+    for key in ("image_url", "image", "thumbnail", "main_image"):
+        image = item.get(key)
+        if isinstance(image, str):
+            cleaned = _clean_image_url(image)
+            if cleaned and cleaned not in image_urls:
+                image_urls.append(cleaned)
+        elif isinstance(image, dict):
+            cleaned = _clean_image_url(str(image.get("url") or image.get("imageUrl") or ""))
+            if cleaned and cleaned not in image_urls:
+                image_urls.append(cleaned)
+
+    for key in ("images", "product_images", "all_images"):
+        images = item.get(key)
+        if isinstance(images, list):
+            for image in images:
+                if isinstance(image, str):
+                    cleaned = _clean_image_url(image)
+                elif isinstance(image, dict):
+                    cleaned = _clean_image_url(str(image.get("url") or image.get("imageUrl") or image.get("hiRes") or ""))
+                else:
+                    cleaned = None
+                if cleaned and cleaned not in image_urls:
+                    image_urls.append(cleaned)
+
+    price = item.get("price") or item.get("lowest_offer_price") or item.get("original_price")
+    asin = item.get("asin") or item.get("product_asin")
+    link = item.get("link") or item.get("url") or item.get("product_url")
+    if asin and not link:
+        link = f"https://www.amazon.com/dp/{asin}"
+
+    return {
+        "source": source,
+        "source_url": link,
+        "name": item.get("title") or item.get("product_name") or item.get("name"),
+        "brand": item.get("brand"),
+        "category": item.get("category") or item.get("category_name"),
+        "description": item.get("description") or item.get("product_description") or item.get("feature_bullets"),
+        "image_urls": image_urls,
+        "attributes": {
+            key: value
+            for key, value in {
+                "listing_price": price,
+                "currency": item.get("currency"),
+                "asin": asin,
+                "rating": item.get("rating"),
+                "reviews": item.get("reviews") or item.get("ratings_total"),
+                "sales_volume": item.get("sales_volume"),
+            }.items()
+            if value not in (None, "", [])
+        },
+        "success": True,
+    }
+
+
+async def _omkar_amazon_search(client: httpx.AsyncClient, query: str, max_results: int = 10) -> List[Dict[str, Any]]:
+    """Search Amazon via amazon-scraper-api.omkar.cloud when configured."""
+    api_key = os.environ.get("AMAZON_SCRAPER_API_KEY", "")
+    if not api_key:
+        return []
+    try:
+        response = await client.get(
+            "https://amazon-scraper-api.omkar.cloud/amazon/search",
+            params={"query": query, "country_code": os.environ.get("AMAZON_COUNTRY_CODE", "US")},
+            headers={"API-Key": api_key},
+            timeout=20.0,
+        )
+        response.raise_for_status()
+        data = response.json()
+        listings = [_amazon_result_to_listing(item, "Amazon Scraper API") for item in data.get("results", [])[:max_results]]
+        listings = [listing for listing in listings if listing.get("name") or listing.get("image_urls")]
+        logger.info("Amazon Scraper API returned %s listings for %r", len(listings), query)
+        return listings
+    except Exception as e:
+        logger.warning(f"Amazon Scraper API search failed: {e}")
+        return []
+
+
+async def _rapidapi_amazon_search(client: httpx.AsyncClient, query: str, max_results: int = 10) -> List[Dict[str, Any]]:
+    """Search Amazon through amazon-product-scraper8 RapidAPI when configured."""
+    api_key = os.environ.get("RAPIDAPI_AMAZON_SCRAPER_KEY") or os.environ.get("RAPIDAPI_KEY", "")
+    if not api_key:
+        return []
+    try:
+        response = await client.get(
+            "https://amazon-product-scraper8.p.rapidapi.com/search/",
+            params={"query": query},
+            headers={
+                "X-RapidAPI-Key": api_key,
+                "X-RapidAPI-Host": "amazon-product-scraper8.p.rapidapi.com",
+            },
+            timeout=20.0,
+        )
+        response.raise_for_status()
+        data = response.json()
+        listings = [_amazon_result_to_listing(item, "Amazon RapidAPI") for item in data.get("results", [])[:max_results]]
+        listings = [listing for listing in listings if listing.get("name") or listing.get("image_urls")]
+        logger.info("Amazon RapidAPI returned %s listings for %r", len(listings), query)
+        return listings
+    except Exception as e:
+        logger.warning(f"Amazon RapidAPI search failed: {e}")
+        return []
+
+
 async def search_product_listing_pages(
     query: str,
     max_results: int = 8,
@@ -474,10 +579,10 @@ async def search_structured_marketplace_listings(
     client = client or httpx.AsyncClient(timeout=20.0, follow_redirects=True)
     try:
         listings: List[Dict[str, Any]] = []
-        for fn in [_ebay_listing_search]:
+        for fn in [_omkar_amazon_search, _rapidapi_amazon_search, _ebay_listing_search]:
             found = await fn(client, query, max_results)
             listings.extend(found)
-            if listings:
+            if len(listings) >= max_results:
                 break
         return listings[:max_results]
     finally:

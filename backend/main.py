@@ -148,6 +148,8 @@ def _image_provider_config() -> Dict[str, bool]:
         "serpapi": bool(os.environ.get("SERPAPI_KEY")),
         "searchapi": bool(os.environ.get("SEARCHAPI_KEY")),
         "ebay_browse": bool(os.environ.get("EBAY_BEARER_TOKEN")),
+        "amazon_scraper_api": bool(os.environ.get("AMAZON_SCRAPER_API_KEY")),
+        "amazon_rapidapi": bool(os.environ.get("RAPIDAPI_AMAZON_SCRAPER_KEY") or os.environ.get("RAPIDAPI_KEY")),
         "html_fallbacks": True,
         "direct_retailer_probes": True,
     }

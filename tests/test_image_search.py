@@ -3,10 +3,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from backend.image_search import (
+    _amazon_result_to_listing,
     _clean_image_url,
     scrape_product_listing_page,
     search_images_for_product,
     search_product_images,
+    search_structured_marketplace_listings,
 )
 
 
@@ -19,6 +21,27 @@ def test_clean_image_url_rejects_invalid():
 def test_clean_image_url_accepts_direct_image():
     url = "https://example.com/product.jpg"
     assert _clean_image_url(url) == url
+
+
+def test_amazon_result_to_listing_maps_images_and_fields():
+    listing = _amazon_result_to_listing(
+        {
+            "title": "Amazon Product",
+            "asin": "B000TEST",
+            "link": "https://www.amazon.com/dp/B000TEST",
+            "image_url": "https://m.media-amazon.com/images/I/test.jpg",
+            "price": 12.99,
+            "currency": "USD",
+            "rating": 4.5,
+        },
+        "Amazon Scraper API",
+    )
+
+    assert listing["source"] == "Amazon Scraper API"
+    assert listing["name"] == "Amazon Product"
+    assert listing["source_url"] == "https://www.amazon.com/dp/B000TEST"
+    assert listing["image_urls"] == ["https://m.media-amazon.com/images/I/test.jpg"]
+    assert listing["attributes"]["asin"] == "B000TEST"
 
 
 @pytest.mark.asyncio
@@ -93,3 +116,15 @@ async def test_scrape_product_listing_page_extracts_metadata():
     assert result["category"] == "Cleaning Supplies"
     assert result["image_urls"] == ["https://cdn.example.com/cleaner.jpg"]
     assert result["attributes"]["listing_price"] == "4.99"
+
+
+@pytest.mark.asyncio
+async def test_structured_marketplace_listings_aggregate_providers():
+    with (
+        patch("backend.image_search._omkar_amazon_search", new=AsyncMock(return_value=[{"source": "Amazon Scraper API"}])),
+        patch("backend.image_search._rapidapi_amazon_search", new=AsyncMock(return_value=[{"source": "Amazon RapidAPI"}])),
+        patch("backend.image_search._ebay_listing_search", new=AsyncMock(return_value=[{"source": "eBay Browse"}])),
+    ):
+        results = await search_structured_marketplace_listings("test", max_results=5)
+
+    assert [r["source"] for r in results] == ["Amazon Scraper API", "Amazon RapidAPI", "eBay Browse"]
