@@ -4,6 +4,7 @@ import pytest
 
 from backend.image_search import (
     _clean_image_url,
+    scrape_product_listing_page,
     search_images_for_product,
     search_product_images,
 )
@@ -61,3 +62,34 @@ async def test_search_images_for_product_builds_query():
         results = await search_images_for_product("Soda", brand="Coca-Cola", max_results=3)
         mock_search.assert_called_once_with("Soda Coca-Cola", max_results=3, client=None)
         assert len(results) == 1
+
+
+@pytest.mark.asyncio
+async def test_scrape_product_listing_page_extracts_metadata():
+    html = """
+    <html>
+      <head>
+        <meta property="og:title" content="Example Cleaner">
+        <meta property="og:description" content="A powerful cleaning product.">
+        <meta property="og:image" content="https://cdn.example.com/cleaner.jpg">
+        <script type="application/ld+json">
+        {"@type":"Product","brand":{"name":"ExampleCo"},"category":"Cleaning Supplies","offers":{"price":"4.99"}}
+        </script>
+      </head>
+    </html>
+    """
+    response = MagicMock()
+    response.text = html
+    response.headers = {"content-type": "text/html"}
+    response.raise_for_status.return_value = None
+    client = MagicMock()
+    client.get = AsyncMock(return_value=response)
+
+    result = await scrape_product_listing_page("https://store.example.com/p/cleaner", client=client)
+
+    assert result["name"] == "Example Cleaner"
+    assert result["description"] == "A powerful cleaning product."
+    assert result["brand"] == "ExampleCo"
+    assert result["category"] == "Cleaning Supplies"
+    assert result["image_urls"] == ["https://cdn.example.com/cleaner.jpg"]
+    assert result["attributes"]["listing_price"] == "4.99"

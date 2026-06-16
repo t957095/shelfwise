@@ -22,6 +22,12 @@ class ProductImage(BaseModel):
     url: str
     source: str
     score: float = 0.0
+    verified: bool = False
+    generated: bool = False
+    needs_review: bool = False
+    query: Optional[str] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
 
 
 class Citation(BaseModel):

@@ -51,8 +51,7 @@ from backend.database import (
 )
 from backend.foundry_agent import ProductReasoningAgent
 from backend.foundry_iq import FoundryIQService, get_foundry_iq_service
-from backend.image_search import search_images_for_product
-from backend.image_verifier import select_verified_images
+from backend.image_acquisition import acquire_required_product_images
 from backend.models import ConsolidatedProduct, ExportRequest, UPCBatchRequest
 from backend.scraper import SOURCE_WEIGHTS, UPCScraper
 
@@ -300,6 +299,7 @@ def _merge_seed_data(
 # ---------------------------------------------------------------------------
 async def process_upc(upc: str, job_id: str, seed_data: Optional[Dict[str, Any]] = None):
     try:
+        raw_data_list: List[Dict[str, Any]] = []
         update_job(job_id, "queued", -1)
         update_job(job_id, "running", 1)
 
@@ -352,37 +352,39 @@ async def process_upc(upc: str, job_id: str, seed_data: Optional[Dict[str, Any]]
 
         logger.info(f"UPC {upc}: consolidated with confidence {consolidated_dict.get('confidence', 0)}")
 
-        # If no verified images were found but we have a product name, try an
-        # image search by name/brand. This is especially useful for local PLUs
-        # and other store-specific codes.
-        if not consolidated_dict.get("image_url") and consolidated_dict.get("name"):
+        # Required image acquisition: source images, retailer/marketplace pages,
+        # UPC image search, then review-marked real candidates before fallback.
+        if not consolidated_dict.get("image_url"):
             try:
-                query_name = consolidated_dict["name"]
-                query_brand = consolidated_dict.get("brand")
-                logger.info(f"UPC {upc}: searching images by name '{query_name}'")
-                search_candidates = await search_images_for_product(
-                    query_name,
-                    query_brand,
-                    max_results=10,
+                acquired_images, best_url, image_trace = await acquire_required_product_images(
+                    consolidated_dict,
+                    raw_sources=raw_data_list,
+                    seed_data=seed_data,
                     client=http_client,
+                    max_images=5,
                 )
-                if search_candidates:
-                    verified, best_url = await select_verified_images(
-                        search_candidates,
-                        product_name=query_name,
-                        product_brand=query_brand,
-                        max_images=5,
-                        client=http_client,
-                    )
-                    if verified:
-                        consolidated_dict["images"] = verified
-                        consolidated_dict["image_url"] = best_url
-                        consolidated_dict["reasoning_trace"].append(
-                            f"Found {len(verified)} verified images via name search"
+                consolidated_dict.setdefault("reasoning_trace", []).extend(image_trace)
+                if acquired_images and best_url:
+                    consolidated_dict["images"] = acquired_images
+                    consolidated_dict["image_url"] = best_url
+                    if any(img.get("needs_review") for img in acquired_images if isinstance(img, dict)):
+                        consolidated_dict.setdefault("citations", []).append(
+                            {
+                                "source": "Image Acquisition",
+                                "source_url": best_url,
+                                "fields": ["images"],
+                                "confidence": 0.35,
+                                "note": "Best real image candidate found; requires user review",
+                            }
                         )
-                        logger.info(f"UPC {upc}: selected {len(verified)} images from name search")
+                    logger.info(
+                        "UPC %s: acquired %s images; best=%s",
+                        upc,
+                        len(acquired_images),
+                        best_url,
+                    )
             except Exception as e:
-                logger.warning(f"UPC {upc}: name-based image search failed: {e}")
+                logger.warning(f"UPC {upc}: required image acquisition failed: {e}")
 
         _ensure_visible_image(consolidated_dict)
 

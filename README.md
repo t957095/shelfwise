@@ -120,10 +120,13 @@ FOUNDRY_ENDPOINT=https://your-resource.openai.azure.com/openai/deployments/gpt-4
 FOUNDRY_API_KEY=your-azure-openai-key
 FOUNDRY_MODEL=gpt-4.1-mini
 
-# Optional - enhances web scraping
+# Optional - required for strongest marketplace/image acquisition
 BRAVE_API_KEY=your-brave-search-key
 GOOGLE_API_KEY=your-google-api-key
 GOOGLE_CX=your-programmable-search-engine-id
+SERPAPI_KEY=your-serpapi-key
+SEARCHAPI_KEY=your-searchapi-io-key
+EBAY_BEARER_TOKEN=your-ebay-browse-api-token
 ```
 
 **Never commit `.env` to Git.** It is already in `.gitignore`.
