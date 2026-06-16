@@ -17,6 +17,8 @@ from typing import Any, Dict, List, Optional
 import httpx
 from bs4 import BeautifulSoup
 
+from backend.retailer_flows import category_key, retailer_domains, retailer_listing_urls
+
 logger = logging.getLogger("shelfwise.image_search")
 
 DEFAULT_HEADERS = {
@@ -133,22 +135,16 @@ def direct_listing_urls_for_upc(upc: str) -> List[str]:
     if not upc:
         return []
     encoded = urllib.parse.quote_plus(upc)
-    return [
+    urls = [
         f"https://www.upcitemdb.com/upc/{encoded}",
         f"https://www.barcodelookup.com/{encoded}",
         f"https://www.buycott.com/upc/{encoded}",
         f"https://go-upc.com/search?q={encoded}",
-        f"https://www.ebay.com/sch/i.html?_nkw={encoded}",
-        f"https://www.walmart.com/search?q={encoded}",
-        f"https://www.amazon.com/s?k={encoded}",
-        f"https://www.target.com/s?searchTerm={encoded}",
-        f"https://www.samsclub.com/sams/search/searchResults.jsp?searchTerm={encoded}",
-        f"https://www.costco.com/CatalogSearch?keyword={encoded}",
-        f"https://www.kroger.com/search?query={encoded}",
-        f"https://www.homedepot.com/s/{encoded}",
-        f"https://www.lowes.com/search?searchTerm={encoded}",
-        f"https://www.staples.com/{encoded}/directory_{encoded}",
     ]
+    for url in retailer_listing_urls(upc, category=None, include_general=True):
+        if url not in urls:
+            urls.append(url)
+    return urls
 
 
 CATEGORY_RETAILER_SEARCH_URLS = {
@@ -226,45 +222,16 @@ CATEGORY_SEARCH_DOMAINS = {
 
 
 def _category_key(category: Optional[str]) -> str:
-    if not category:
-        return ""
-    normalized = category.strip().lower()
-    if "pet" in normalized:
-        return "pet care"
-    if "clean" in normalized:
-        return "cleaning"
-    if "household" in normalized:
-        return "household"
-    if "baby" in normalized:
-        return "baby care"
-    if "personal" in normalized or "health" in normalized or "beauty" in normalized:
-        return "personal care"
-    if "beverage" in normalized or "drink" in normalized or "cola" in normalized:
-        return "beverages"
-    if "snack" in normalized or "cracker" in normalized or "cookie" in normalized:
-        return "snacks"
-    if "frozen" in normalized:
-        return "frozen"
-    if "office" in normalized:
-        return "office"
-    return normalized
+    return category_key(category)
 
 
 def category_listing_urls_for_upc(upc: str, category: Optional[str]) -> List[str]:
     """Category-specific retailer searches for a UPC/POS department."""
-    key = _category_key(category)
-    templates = CATEGORY_RETAILER_SEARCH_URLS.get(key, [])
-    encoded = urllib.parse.quote_plus(upc)
-    urls = []
-    for template in templates:
-        url = template.format(query=encoded)
-        if url not in urls:
-            urls.append(url)
-    return urls
+    return retailer_listing_urls(upc, category=category, include_general=False)
 
 
 def category_search_domains(category: Optional[str]) -> List[str]:
-    return CATEGORY_SEARCH_DOMAINS.get(_category_key(category), [])
+    return retailer_domains(category=category, include_general=False)
 
 
 async def _brave_image_search(client: httpx.AsyncClient, query: str, max_results: int = 10) -> List[str]:

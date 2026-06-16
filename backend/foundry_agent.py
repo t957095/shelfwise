@@ -60,6 +60,7 @@ try:
 except Exception:
     _OPENAI_AVAILABLE = False
 
+from backend.foundry_tools import build_foundry_tool_context
 from backend.image_verifier import select_verified_images
 
 SOURCE_WEIGHTS = {
@@ -119,6 +120,21 @@ def _normalize_category(category: Optional[str]) -> Optional[str]:
     cat = str(category).strip()
     key = cat.lower()
     return CATEGORY_ALIASES.get(key, cat)
+
+
+def _is_meaningful_value(value: Optional[str]) -> bool:
+    if not value:
+        return False
+    normalized = str(value).strip().lower()
+    return normalized not in {
+        "",
+        "unknown",
+        "unknown product",
+        "n/a",
+        "none",
+        "product not found",
+        "not available",
+    }
 
 
 def _jaccard_similarity(a: str, b: str) -> float:
@@ -263,27 +279,38 @@ class ProductReasoningAgent:
         # Step 9: Microsoft Foundry LLM enrichment (never blocks)
         foundry_result = await self._foundry_reasoning_call(upc, raw_data_list, name, brand, category, description)
         if foundry_result and foundry_result.get("data"):
-            trace.append("Microsoft Foundry reasoning applied")
             llm_data = foundry_result["data"]
             if isinstance(llm_data, dict):
-                if llm_data.get("name"):
+                meaningful_fields = [
+                    key
+                    for key in ("name", "brand", "category", "description")
+                    if _is_meaningful_value(llm_data.get(key))
+                ]
+                meaningful_attributes = bool(llm_data.get("attributes") and isinstance(llm_data["attributes"], dict))
+                if not meaningful_fields and not meaningful_attributes:
+                    trace.append("Microsoft Foundry returned no meaningful product fields")
+                else:
+                    trace.append("Microsoft Foundry reasoning applied")
+                    if foundry_result.get("tool_context"):
+                        trace.append("Foundry retailer tool context prepared")
+                if _is_meaningful_value(llm_data.get("name")):
                     name = llm_data["name"]
-                if llm_data.get("brand"):
+                if _is_meaningful_value(llm_data.get("brand")):
                     brand = llm_data["brand"]
-                if llm_data.get("category"):
+                if _is_meaningful_value(llm_data.get("category")):
                     category = llm_data["category"]
-                if llm_data.get("description"):
+                if _is_meaningful_value(llm_data.get("description")):
                     description = llm_data["description"]
                 if llm_data.get("attributes") and isinstance(llm_data["attributes"], dict):
                     attributes.update(llm_data["attributes"])
                 # If Foundry returns meaningful data, boost confidence and status
-                if name and brand and category:
+                if _is_meaningful_value(name) and _is_meaningful_value(brand) and _is_meaningful_value(category):
                     confidence = min(1.0, confidence + 0.25)
                     if status == "error":
                         status = "complete"
                         trace.append("Status promoted from error to complete by Foundry LLM")
                     trace.append("Foundry enriched fields merged — full product data from LLM")
-                else:
+                elif meaningful_fields or meaningful_attributes:
                     confidence = min(1.0, confidence + 0.15)
                     trace.append("Foundry enriched fields merged")
 
@@ -300,7 +327,14 @@ class ProductReasoningAgent:
             "status": status,
             "citations": citations,
             "reasoning_trace": trace,
-            "foundry_enriched": bool(foundry_result and foundry_result.get("data")),
+            "foundry_enriched": bool(
+                foundry_result
+                and foundry_result.get("data")
+                and (
+                    any(_is_meaningful_value(foundry_result["data"].get(key)) for key in ("name", "brand", "category", "description"))
+                    or bool(foundry_result["data"].get("attributes"))
+                )
+            ),
             "foundry_sdk": (foundry_result.get("sdk") if foundry_result else None),
         }
 
@@ -326,8 +360,15 @@ class ProductReasoningAgent:
         model = os.environ.get("FOUNDRY_MODEL", "gpt-4o-mini")
 
         # Build structured prompt
+        tool_context = build_foundry_tool_context(upc, current_category)
         prompt = self._build_llm_prompt(
-            upc, raw_data_list, current_name, current_brand, current_category, current_description
+            upc,
+            raw_data_list,
+            current_name,
+            current_brand,
+            current_category,
+            current_description,
+            tool_context=tool_context,
         )
 
         # --- Tier 1: Azure AI Inference SDK ---
@@ -335,7 +376,7 @@ class ProductReasoningAgent:
             try:
                 result = await self._azure_inference_complete(prompt, model)
                 if result:
-                    return {"data": result, "sdk": "azure-ai-inference"}
+                    return {"data": result, "sdk": "azure-ai-inference", "tool_context": tool_context}
             except Exception:
                 pass
 
@@ -344,7 +385,7 @@ class ProductReasoningAgent:
             try:
                 result = await self._azure_projects_complete(prompt, model)
                 if result:
-                    return {"data": result, "sdk": "azure-ai-projects"}
+                    return {"data": result, "sdk": "azure-ai-projects", "tool_context": tool_context}
             except Exception:
                 pass
 
@@ -353,7 +394,7 @@ class ProductReasoningAgent:
             try:
                 result = await self._openai_compatible_complete(prompt, model)
                 if result:
-                    return {"data": result, "sdk": "openai-compatible"}
+                    return {"data": result, "sdk": "openai-compatible", "tool_context": tool_context}
             except Exception:
                 pass
 
@@ -440,9 +481,11 @@ class ProductReasoningAgent:
         brand: Optional[str],
         category: Optional[str],
         description: str,
+        tool_context: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Build a structured prompt for LLM enrichment."""
         sources_text = json.dumps(raw_data_list, indent=2, default=str)[:4000]
+        tools_text = json.dumps(tool_context or {}, indent=2, default=str)[:3000]
         prompt = f"""You are a product data enrichment agent for ShelfWise, an AI Product Portfolio Builder.
 
 UPC: {upc}
@@ -454,6 +497,9 @@ Current draft data:
 
 Raw source data:
 {sources_text}
+
+Available Foundry-style function tools and pre-executed retailer workflow context:
+{tools_text}
 
 Your task: Produce a JSON object with these exact keys (no markdown, no explanation):
 {{
@@ -468,6 +514,7 @@ Rules:
 - Keep the name factual and concise.
 - Description should be marketing-ready but accurate.
 - Only include attributes you are confident about.
+- Use the retailer workflow context to prefer category-specific stores and marketplace evidence.
 - If current data is already good, return it unchanged.
 - Output ONLY valid JSON. No markdown fences.
 """

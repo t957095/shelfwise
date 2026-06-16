@@ -51,9 +51,11 @@ from backend.database import (
 )
 from backend.foundry_agent import ProductReasoningAgent
 from backend.foundry_iq import FoundryIQService, get_foundry_iq_service
+from backend.foundry_tools import FOUNDRY_PRODUCT_TOOL_DEFINITIONS, build_foundry_tool_context
 from backend.image_acquisition import acquire_required_product_images
-from backend.image_search import CATEGORY_RETAILER_SEARCH_URLS, direct_listing_urls_for_upc
+from backend.image_search import direct_listing_urls_for_upc
 from backend.models import ConsolidatedProduct, ExportRequest, UPCBatchRequest
+from backend.retailer_flows import retailer_source_counts
 from backend.scraper import SOURCE_WEIGHTS, UPCScraper
 
 logging.basicConfig(level=logging.INFO)
@@ -184,13 +186,15 @@ def _registry_source_capabilities() -> Dict[str, Any]:
 
 def _acquisition_source_capabilities() -> Dict[str, Any]:
     providers = _image_provider_config()
-    category_probe_total = sum(len(templates) for templates in CATEGORY_RETAILER_SEARCH_URLS.values())
+    retailer_counts = retailer_source_counts()
+    category_probe_total = sum(retailer_counts["retailer_categories"].values())
     return {
         "direct_retailer_probe_sources": len(direct_listing_urls_for_upc("000000000000")),
+        "retailer_programs": retailer_counts["retailer_programs"],
+        "retailer_domains": retailer_counts["retailer_domains"],
+        "retailer_task_types": retailer_counts["retailer_task_types"],
         "category_specific_probe_total": category_probe_total,
-        "category_specific_probe_sources": {
-            category: len(templates) for category, templates in CATEGORY_RETAILER_SEARCH_URLS.items()
-        },
+        "category_specific_probe_sources": retailer_counts["retailer_categories"],
         "structured_marketplace_providers": [
             "Amazon Scraper API",
             "Amazon RapidAPI",
@@ -1444,6 +1448,7 @@ async def health_check():
             "scraping": True,
             "reasoning": True,
             "foundry_integration": True,
+            "foundry_tool_calls": True,
             "foundry_mode": fiq_health.get("mode", "unknown"),
             "caching": True,
             "learning": True,
@@ -1459,6 +1464,7 @@ async def health_check():
         "image_acquisition": {
             "providers": _image_provider_config(),
             "direct_probe_sources": len(direct_listing_urls_for_upc("000000000000")),
+            "retailer_programs": retailer_source_counts()["retailer_programs"],
         },
         "foundry_iq": fiq_health,
     }
@@ -1640,6 +1646,19 @@ async def foundry_history(limit: int = Query(50, ge=1, le=200)):
     if not foundry_iq:
         raise HTTPException(status_code=503, detail="Foundry IQ service not initialized")
     return {"queries": foundry_iq.get_query_history(limit=limit)}
+
+
+@app.get("/api/foundry/tools")
+async def foundry_tools(
+    identifier: str = Query("000000000000", description="UPC, SKU, or POS identifier for a sample tool plan"),
+    category: Optional[str] = Query(None, description="Optional POS category for category-aware routing"),
+):
+    """Return ShelfWise function tools and a deterministic retailer workflow plan."""
+    return {
+        "tools": FOUNDRY_PRODUCT_TOOL_DEFINITIONS,
+        "context": build_foundry_tool_context(identifier, category),
+        "note": "These function tools are the contract used by the Foundry reasoning layer for retailer task flows.",
+    }
 
 
 @app.post("/api/foundry/ingest")

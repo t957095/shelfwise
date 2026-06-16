@@ -26,6 +26,7 @@ A multi-step reasoning agent resolves conflicting names, deduplicates evidence, 
 
 **Key capabilities:**
 - **Web-wide evidence gathering** — 10 core sources plus a registry of 270+ additional sources, queried concurrently. Searches the broader web, not just a fixed UPC catalog.
+- **Direct retailer programs** — Category-aware task flows probe Amazon, eBay, Walmart, Target, Sam's Club, Costco, Kroger, Chewy, Petco, PetSmart, Tractor Supply, Home Depot, Lowe's, Grainger, Uline, Staples, Office Depot, Walgreens, and CVS.
 - **Multi-step reasoning agent** — Jaccard deduplication, weighted brand/category resolution, attribute normalization, confidence scoring, and grounded citations.
 - **Verified product imagery** — Downloads and scores every candidate photo for white/clean backgrounds, resolution, central product focus, sharpness, frame fill, and source validity, then returns a ranked gallery of up to 5 verified multi-angle photos per product.
 - **Name-based image search fallback** — When a barcode has no public match, ShelfWise searches the web by product name/brand and verifies those images.
@@ -143,7 +144,6 @@ AMAZON_COUNTRY_CODE=US
 | `/` | GET | App info and feature list |
 | `/app` | GET | Web application (frontend) |
 | `/api/health` | GET | Health check with feature flags |
-| `/api/demo` | GET | Load 3 demo UPCs |
 | `/api/batch` | POST | Submit UPCs for processing |
 | `/api/upload-csv` | POST | Upload POS CSV; auto-detects UPC/EAN/SKU/PLU, accepts `max_rows` query param |
 | `/api/upload-csv/preview` | POST | Preview a POS CSV: detected columns and sample UPCs |
@@ -154,6 +154,8 @@ AMAZON_COUNTRY_CODE=US
 | `/api/export` | POST | Export as csv/json/shopify/amazon |
 | `/api/jobs/{job_id}` | GET | Get job status |
 | `/api/jobs/{job_id}/stream` | GET | SSE stream of live updates |
+| `/api/sources` | GET | Source redundancy counts, retailer programs, and acquisition channels |
+| `/api/foundry/tools` | GET | Foundry function-tool definitions and sample retailer workflow context |
 | `/api/stats` | GET | Portfolio analytics and statistics |
 | `/api/products/{upc}/compare` | GET | Compare raw vs consolidated data |
 | `/api/clear` | POST | Clear all products and jobs |
@@ -177,12 +179,13 @@ curl -X POST http://localhost:8000/api/export \
 
 ## Microsoft Foundry IQ Integration
 
-ShelfWise integrates with Microsoft Foundry IQ through Azure OpenAI Service. The integration is **architecturally complete and functional**:
+ShelfWise integrates with Microsoft Foundry through Azure OpenAI, Azure AI Inference, and Azure AI Projects when credentials are configured. The integration is **architecturally complete and functional**:
 
-1. **Knowledge Retrieval** - The scraper acts as the knowledge retrieval layer, pulling structured and unstructured data from 8 public sources
+1. **Knowledge Retrieval** - The scraper acts as the knowledge retrieval layer, pulling structured and unstructured data from core UPC databases, 270+ registry sources, and category-aware retailer programs
 2. **Citations** - Every field in the consolidated record includes source attribution with confidence scores (Foundry IQ-style grounding)
-3. **LLM Enrichment** - When `FOUNDRY_ENDPOINT` and `FOUNDRY_API_KEY` are configured, the reasoning agent sends raw source data to GPT-4.1-mini for advanced consolidation, then merges the LLM output back into the final record with a +0.15 confidence boost
-4. **Graceful Degradation** - If Foundry is unavailable, the deterministic local reasoning engine produces complete, high-quality results without any external dependency
+3. **Foundry Tool Calls** - `/api/foundry/tools` exposes function tools for retailer workflow planning, direct retailer probe URLs, and category-scoped search domains
+4. **LLM Enrichment** - When `FOUNDRY_ENDPOINT`/`FOUNDRY_API_KEY` or `AZURE_FOUNDRY_CONNECTION_STRING` are configured, the reasoning agent sends raw evidence plus the retailer tool context to Foundry for advanced consolidation
+5. **Graceful Degradation** - If Foundry is unavailable, the deterministic local reasoning engine and local Foundry IQ-style knowledge graph continue to produce cited product records
 
 Run `backend/setup-azure-openai.ps1` to automatically provision the Azure OpenAI resource and configure the connection.
 
