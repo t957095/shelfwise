@@ -141,6 +141,18 @@ def get_scraper() -> UPCScraper:
     return scraper
 
 
+def _image_provider_config() -> Dict[str, bool]:
+    return {
+        "brave": bool(os.environ.get("BRAVE_API_KEY")),
+        "google_custom_search": bool(os.environ.get("GOOGLE_API_KEY") and os.environ.get("GOOGLE_CX")),
+        "serpapi": bool(os.environ.get("SERPAPI_KEY")),
+        "searchapi": bool(os.environ.get("SEARCHAPI_KEY")),
+        "ebay_browse": bool(os.environ.get("EBAY_BEARER_TOKEN")),
+        "html_fallbacks": True,
+        "direct_retailer_probes": True,
+    }
+
+
 def _is_local_plu(upc: str) -> bool:
     """Return True for locally-assigned / variable-weight codes (e.g. starting with 2).
 
@@ -1377,6 +1389,7 @@ async def health_check():
             "foundry_mode": fiq_health.get("mode", "unknown"),
             "caching": True,
             "learning": True,
+            "required_image_acquisition": True,
         },
         "scrapers": {
             "core": len(SOURCE_WEIGHTS),
@@ -1385,6 +1398,10 @@ async def health_check():
             "names": list(SOURCE_WEIGHTS.keys())[:10],  # First 10 names
         },
         "cache": upc_cache.stats(),
+        "image_acquisition": {
+            "providers": _image_provider_config(),
+            "direct_probe_sources": 14,
+        },
         "foundry_iq": fiq_health,
     }
 

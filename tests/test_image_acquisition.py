@@ -46,6 +46,7 @@ async def test_acquire_required_product_images_applies_listing_evidence():
     assert product["brand"] == "Example Brand"
     assert product["description"] == "A real product description from a retailer listing."
     assert product["citations"][0]["source"] == "example-retailer.com"
+    assert product["attributes"]["image_acquisition_sources"][0]["source"] == "example-retailer.com"
     assert any("listing evidence" in line.lower() for line in trace)
 
 
@@ -75,4 +76,5 @@ async def test_acquire_required_product_images_returns_review_candidate_when_unv
     assert best_url == "https://example.com/candidate.jpg"
     assert images[0]["needs_review"] is True
     assert images[0]["verified"] is False
+    assert product["attributes"]["image_acquisition_sources"][0]["kind"] == "image-search"
     assert any("real image candidates" in line for line in trace)

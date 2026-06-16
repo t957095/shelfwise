@@ -21,6 +21,7 @@ class RawProductData(BaseModel):
 class ProductImage(BaseModel):
     url: str
     source: str
+    source_url: Optional[str] = None
     score: float = 0.0
     verified: bool = False
     generated: bool = False

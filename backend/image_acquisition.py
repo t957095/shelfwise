@@ -73,6 +73,19 @@ def _dedupe_candidates(candidates: Iterable[Dict[str, Any]]) -> List[Dict[str, A
     return deduped
 
 
+def _record_acquisition_source(product: Dict[str, Any], source: str, kind: str, detail: Optional[str] = None) -> None:
+    if not source:
+        return
+    attrs = product.setdefault("attributes", {})
+    sources = attrs.setdefault("image_acquisition_sources", [])
+    key = (source, kind, detail or "")
+    for existing in sources:
+        if (existing.get("source"), existing.get("kind"), existing.get("detail") or "") == key:
+            existing["count"] = int(existing.get("count", 1)) + 1
+            return
+    sources.append({"source": source, "kind": kind, "detail": detail, "count": 1})
+
+
 def _source_image_candidates(raw_sources: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
     candidates: List[Dict[str, Any]] = []
     for source in raw_sources or []:
@@ -97,6 +110,8 @@ def _build_image_queries(product: Dict[str, Any], seed_data: Optional[Dict[str, 
                 f'"{upc}" product image',
                 f'"{upc}" UPC product photo',
                 f'"{upc}" package front',
+                f'"{upc}" site:walmart.com OR site:target.com OR site:ebay.com',
+                f'"{upc}" site:amazon.com OR site:samsclub.com OR site:costco.com',
             ]
         )
     if name and not _is_generic_name(name, upc):
@@ -105,6 +120,7 @@ def _build_image_queries(product: Dict[str, Any], seed_data: Optional[Dict[str, 
         queries.append(" ".join(part for part in [brand, seed_name, "product image"] if part))
     if category and upc:
         queries.append(f'"{upc}" {category} product package')
+        queries.append(f"{category} {upc} retailer listing")
 
     deduped = []
     seen = set()
@@ -254,6 +270,8 @@ async def acquire_required_product_images(
     source_candidates = _source_image_candidates(raw_sources or [])
     if source_candidates:
         trace.append(f"Image acquisition: collected {len(source_candidates)} source image candidates")
+        for candidate in source_candidates:
+            _record_acquisition_source(product, candidate.get("source", "Source Image"), "scraper-image", candidate.get("url"))
 
     search_candidates: List[Dict[str, Any]] = []
     listing_evidence: List[Dict[str, Any]] = []
@@ -262,11 +280,13 @@ async def acquire_required_product_images(
         trace.append(f"Image acquisition: direct UPC probes produced {len(direct_evidence)} listing evidence pages")
         listing_evidence.extend(direct_evidence)
         for listing in direct_evidence:
+            _record_acquisition_source(product, listing.get("source", "Direct UPC Listing"), "direct-listing", listing.get("source_url"))
             for url in listing.get("image_urls") or []:
                 search_candidates.append(
                     {
                         "url": url,
                         "source": listing.get("source") or "Direct UPC Listing",
+                        "source_url": listing.get("source_url"),
                         "score": 0.66,
                         "query": upc,
                     }
@@ -285,11 +305,13 @@ async def acquire_required_product_images(
             trace.append(f"Image acquisition: query '{query}' produced {len(structured)} structured marketplace listings")
             listing_evidence.extend(structured)
             for listing in structured:
+                _record_acquisition_source(product, listing.get("source", "Structured Marketplace"), "marketplace-api", listing.get("source_url"))
                 for url in listing.get("image_urls") or []:
                     search_candidates.append(
                         {
                             "url": url,
                             "source": listing.get("source") or "Marketplace Image",
+                            "source_url": listing.get("source_url"),
                             "score": 0.7,
                             "query": query,
                         }
@@ -300,11 +322,13 @@ async def acquire_required_product_images(
             trace.append(f"Image acquisition: query '{query}' produced {len(listings)} listing evidence pages")
             listing_evidence.extend(listings)
             for listing in listings:
+                _record_acquisition_source(product, listing.get("source", "Listing Search"), "listing-page", listing.get("source_url"))
                 for url in listing.get("image_urls") or []:
                     search_candidates.append(
                         {
                             "url": url,
                             "source": listing.get("source") or "Listing Image",
+                            "source_url": listing.get("source_url"),
                             "score": 0.62,
                             "query": query,
                         }
@@ -313,6 +337,8 @@ async def acquire_required_product_images(
         found = await _search_query(query, client, max_results=max_images, timeout=per_query_timeout)
         if found:
             trace.append(f"Image acquisition: query '{query}' returned {len(found)} candidates")
+            for candidate in found:
+                _record_acquisition_source(product, candidate.get("source", "Image Search"), "image-search", query)
         search_candidates.extend(found)
         if len(_dedupe_candidates(source_candidates + search_candidates)) >= max_images * 2:
             break
@@ -353,6 +379,7 @@ async def acquire_required_product_images(
                 "verified": False,
                 "needs_review": True,
                 "query": candidate.get("query"),
+                "source_url": candidate.get("source_url"),
             }
         )
 

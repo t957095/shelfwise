@@ -142,6 +142,12 @@ def direct_listing_urls_for_upc(upc: str) -> List[str]:
         f"https://www.walmart.com/search?q={encoded}",
         f"https://www.amazon.com/s?k={encoded}",
         f"https://www.target.com/s?searchTerm={encoded}",
+        f"https://www.samsclub.com/sams/search/searchResults.jsp?searchTerm={encoded}",
+        f"https://www.costco.com/CatalogSearch?keyword={encoded}",
+        f"https://www.kroger.com/search?query={encoded}",
+        f"https://www.homedepot.com/s/{encoded}",
+        f"https://www.lowes.com/search?searchTerm={encoded}",
+        f"https://www.staples.com/{encoded}/directory_{encoded}",
     ]
 
 
@@ -437,7 +443,8 @@ async def search_product_listing_pages(
     _owned = client is None
     client = client or httpx.AsyncClient(timeout=20.0, follow_redirects=True)
     try:
-        urls: List[str] = []
+        results: List[Dict[str, Any]] = []
+        seen_urls = set()
         for fn, source in [
             (_brave_listing_search, "Brave Listings"),
             (_serpapi_listing_search, "SerpAPI Listings"),
@@ -446,12 +453,12 @@ async def search_product_listing_pages(
         ]:
             found = await fn(client, query, max_results)
             for url in found:
-                if url not in urls:
-                    urls.append(url)
-            if urls:
-                logger.info("Listing search for %r succeeded via %s", query, source)
+                if url not in seen_urls:
+                    seen_urls.add(url)
+                    results.append({"url": url, "source": source})
+            if len(results) >= max_results:
                 break
-        return [{"url": url, "source": "Listing Search"} for url in urls[:max_results]]
+        return results[:max_results]
     finally:
         if _owned:
             await client.aclose()
@@ -647,7 +654,8 @@ async def search_product_images(
     _owned = client is None
     client = client or httpx.AsyncClient(timeout=20.0, follow_redirects=True)
     try:
-        urls: List[str] = []
+        results: List[Dict[str, Any]] = []
+        seen_urls = set()
         for fn, source in [
             (_brave_image_search, "Brave Image Search"),
             (_serpapi_image_search, "SerpAPI Images"),
@@ -658,13 +666,13 @@ async def search_product_images(
         ]:
             found = await fn(client, query, max_results)
             for u in found:
-                if u not in urls:
-                    urls.append(u)
-            if urls:
-                logger.info(f"Image search for '{query}' succeeded via {source}")
+                if u not in seen_urls:
+                    seen_urls.add(u)
+                    results.append({"url": u, "source": source})
+            if len(results) >= max_results:
                 break
 
-        return [{"url": u, "source": "Image Search"} for u in urls[:max_results]]
+        return results[:max_results]
     finally:
         if _owned:
             await client.aclose()

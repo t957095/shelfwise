@@ -51,7 +51,7 @@ async def test_search_product_images_falls_back_to_duckduckgo():
 
     assert len(results) == 2
     assert results[0]["url"] == "https://example.com/img1.jpg"
-    assert results[0]["source"] == "Image Search"
+    assert results[0]["source"] == "DuckDuckGo Images"
 
 
 @pytest.mark.asyncio
